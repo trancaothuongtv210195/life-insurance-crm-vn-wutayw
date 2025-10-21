@@ -65,11 +65,7 @@ export interface Customer {
   occupation?: string;
   financialStatus?: string;
   familyInfo?: string;
-  location?: {
-    latitude: number;
-    longitude: number;
-    address?: string;
-  };
+  location?: string; // Changed to single coordinate string
   meetingRecords: MeetingRecord[];
   files: FileAttachment[];
   hasInsurance: boolean;
@@ -108,6 +104,18 @@ export interface DashboardStats {
   upcomingMeetings: number;
   upcomingPayments: number;
   newCustomersThisMonth: number;
+  upcomingBirthdays: number;
+  overduePayments: number;
+}
+
+export interface CustomerReminder {
+  customerId: string;
+  customerName: string;
+  type: 'birthday' | 'payment-due' | 'payment-overdue';
+  daysUntil?: number; // For birthday and payment-due
+  daysOverdue?: number; // For payment-overdue
+  date: Date;
+  message: string;
 }
 
 // Vietnamese address data

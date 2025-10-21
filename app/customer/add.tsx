@@ -48,8 +48,7 @@ export default function AddCustomerScreen() {
   const [occupation, setOccupation] = useState('');
   const [financialStatus, setFinancialStatus] = useState('');
   const [familyInfo, setFamilyInfo] = useState('');
-  const [locationLat, setLocationLat] = useState('');
-  const [locationLng, setLocationLng] = useState('');
+  const [locationCoordinates, setLocationCoordinates] = useState('');
   
   // Meeting info
   const [meetingDate, setMeetingDate] = useState(new Date());
@@ -138,21 +137,27 @@ export default function AddCustomerScreen() {
       Alert.alert('Lỗi', 'Vui lòng chọn công ty bảo hiểm');
       return;
     }
-    if (!currentContractNumber) {
+    if (!currentContractNumber.trim()) {
       Alert.alert('Lỗi', 'Vui lòng nhập số hợp đồng');
       return;
     }
     
     // Check duplicate contract number
-    if (checkContractNumberExists(currentContractNumber)) {
-      Alert.alert('Cảnh báo', 'Số hợp đồng này đã tồn tại trong hệ thống');
+    if (checkContractNumberExists(currentContractNumber.trim())) {
+      Alert.alert('Cảnh báo', 'Số hợp đồng này đã tồn tại trong hệ thống. Vui lòng kiểm tra lại.');
+      return;
+    }
+    
+    // Check duplicate within current contracts
+    if (insuranceContracts.some(c => c.contractNumber === currentContractNumber.trim())) {
+      Alert.alert('Cảnh báo', 'Số hợp đồng này đã được thêm vào danh sách');
       return;
     }
     
     const newContract: InsuranceContract = {
       id: Date.now().toString(),
       company: currentCompany,
-      contractNumber: currentContractNumber,
+      contractNumber: currentContractNumber.trim(),
       policyDetails: currentPolicyDetails,
       joinDate: currentJoinDate,
       premiumAmounts: currentPremiumAmounts,
@@ -186,7 +191,7 @@ export default function AddCustomerScreen() {
     }
 
     // Check for duplicate phone number
-    if (checkPhoneNumberExists(phoneNumber)) {
+    if (checkPhoneNumberExists(phoneNumber.trim())) {
       Alert.alert('Cảnh báo', 'Số điện thoại này đã tồn tại trong hệ thống. Vui lòng kiểm tra lại.');
       return;
     }
@@ -201,11 +206,6 @@ export default function AddCustomerScreen() {
       notes: meetingNotes,
       createdAt: new Date(),
     }] : [];
-
-    const location = locationLat && locationLng ? {
-      latitude: parseFloat(locationLat),
-      longitude: parseFloat(locationLng),
-    } : undefined;
 
     const newCustomer = {
       avatar,
@@ -223,7 +223,7 @@ export default function AddCustomerScreen() {
         province: provinceName,
         city: provinceName,
       },
-      location,
+      location: locationCoordinates.trim(),
       meetingRecords,
       files,
       hasInsurance,
@@ -243,6 +243,12 @@ export default function AddCustomerScreen() {
       case 'quarter': return 'Quý';
       case '6-month': return 'Nửa năm';
       case 'year': return 'Năm';
+    }
+  };
+
+  const openMapLocation = () => {
+    if (locationCoordinates.trim()) {
+      Linking.openURL(`https://www.google.com/maps?q=${locationCoordinates.trim()}`);
     }
   };
 
@@ -304,7 +310,7 @@ export default function AddCustomerScreen() {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Số điện thoại *</Text>
+              <Text style={styles.label}>Số điện thoại * (không được trùng)</Text>
               <View style={styles.phoneContainer}>
                 <TextInput
                   style={[styles.input, { flex: 1 }]}
@@ -388,7 +394,7 @@ export default function AddCustomerScreen() {
 
           {/* Address */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Địa chỉ</Text>
+            <Text style={styles.sectionTitle}>Địa chỉ chi tiết</Text>
             
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Tỉnh/Thành phố</Text>
@@ -445,36 +451,25 @@ export default function AddCustomerScreen() {
           {/* Location */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Vị trí (Google Maps)</Text>
-            <Text style={styles.helperText}>Nhập tọa độ từ Google Maps</Text>
+            <Text style={styles.helperText}>
+              Copy toàn bộ tọa độ từ Google Maps (VD: 10.762622, 106.660172)
+            </Text>
             
-            <View style={styles.row}>
-              <View style={[styles.inputContainer, { flex: 1, marginRight: 8 }]}>
-                <Text style={styles.label}>Vĩ độ (Latitude)</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="10.762622"
-                  placeholderTextColor={colors.textSecondary}
-                  value={locationLat}
-                  onChangeText={setLocationLat}
-                  keyboardType="decimal-pad"
-                />
-              </View>
-              <View style={[styles.inputContainer, { flex: 1, marginLeft: 8 }]}>
-                <Text style={styles.label}>Kinh độ (Longitude)</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="106.660172"
-                  placeholderTextColor={colors.textSecondary}
-                  value={locationLng}
-                  onChangeText={setLocationLng}
-                  keyboardType="decimal-pad"
-                />
-              </View>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Tọa độ</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="10.762622, 106.660172"
+                placeholderTextColor={colors.textSecondary}
+                value={locationCoordinates}
+                onChangeText={setLocationCoordinates}
+              />
             </View>
-            {locationLat && locationLng && (
+            
+            {locationCoordinates.trim() && (
               <TouchableOpacity
                 style={styles.mapButton}
-                onPress={() => Linking.openURL(`https://www.google.com/maps?q=${locationLat},${locationLng}`)}
+                onPress={openMapLocation}
               >
                 <IconSymbol name="map" size={20} color={colors.secondary} />
                 <Text style={styles.mapButtonText}>Xem trên bản đồ</Text>
@@ -619,7 +614,7 @@ export default function AddCustomerScreen() {
                     </View>
 
                     <View style={styles.inputContainer}>
-                      <Text style={styles.label}>Số hợp đồng *</Text>
+                      <Text style={styles.label}>Số hợp đồng * (không được trùng)</Text>
                       <TextInput
                         style={styles.input}
                         placeholder="Nhập số hợp đồng"
@@ -965,6 +960,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textSecondary,
     marginBottom: 12,
+    fontStyle: 'italic',
   },
   avatarContainer: {
     alignSelf: 'center',

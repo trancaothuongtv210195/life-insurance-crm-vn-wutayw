@@ -1,12 +1,13 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Customer, Meeting, LearningContent, DashboardStats, InsuranceContract, MeetingRecord } from '@/types';
+import { Customer, Meeting, LearningContent, DashboardStats, InsuranceContract, MeetingRecord, CustomerReminder } from '@/types';
 
 interface DataContextType {
   customers: Customer[];
   meetings: Meeting[];
   learningContent: LearningContent[];
   dashboardStats: DashboardStats;
+  reminders: CustomerReminder[];
   addCustomer: (customer: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>) => void;
   updateCustomer: (id: string, customer: Partial<Customer>) => void;
   deleteCustomer: (id: string) => void;
@@ -38,6 +39,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         phoneNumber: '0901234567',
         dateOfBirth: new Date('1985-05-15'),
         address: {
+          hamlet: 'Ấp 3',
           commune: 'Phường Tân Định',
           district: 'Quận 1',
           city: 'TP. Hồ Chí Minh',
@@ -47,6 +49,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         familyInfo: 'Đã kết hôn, có 2 con',
         classification: 'Signed',
         hasInsurance: true,
+        location: '10.762622, 106.660172',
         insuranceContracts: [
           {
             id: '1',
@@ -56,7 +59,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             joinDate: new Date('2023-01-15'),
             premiumAmounts: '5000000',
             paymentFrequency: 'month',
-            nextPaymentDate: new Date('2024-02-15'),
+            nextPaymentDate: new Date(Date.now() + 25 * 24 * 60 * 60 * 1000), // 25 days from now
           },
         ],
         meetingRecords: [
@@ -82,8 +85,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         id: '2',
         fullName: 'Trần Thị Bình',
         phoneNumber: '0912345678',
-        dateOfBirth: new Date('1990-08-20'),
+        dateOfBirth: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // Birthday in 3 days
         address: {
+          hamlet: 'Ấp 5',
           commune: 'Xã Tân Phú Trung',
           district: 'Huyện Củ Chi',
           city: 'TP. Hồ Chí Minh',
@@ -113,13 +117,25 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         phoneNumber: '0923456789',
         dateOfBirth: new Date('1988-03-10'),
         address: {
+          commune: 'Phường 5',
           district: 'Quận 3',
           city: 'TP. Hồ Chí Minh',
         },
         occupation: 'Kinh doanh',
-        classification: 'Dropped',
-        hasInsurance: false,
-        insuranceContracts: [],
+        classification: 'Signed',
+        hasInsurance: true,
+        insuranceContracts: [
+          {
+            id: '1',
+            company: 'Manulife Việt Nam',
+            contractNumber: 'MAN001234',
+            policyDetails: 'Bảo hiểm sức khỏe',
+            joinDate: new Date('2023-06-01'),
+            premiumAmounts: '3000000',
+            paymentFrequency: 'quarter',
+            nextPaymentDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), // 10 days overdue
+          },
+        ],
         meetingRecords: [],
         files: [],
         createdBy: '1',
@@ -164,9 +180,77 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
   };
 
+  const calculateReminders = (): CustomerReminder[] => {
+    const reminders: CustomerReminder[] = [];
+    const now = new Date();
+    const fiveDaysFromNow = new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000);
+    const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    customers.forEach(customer => {
+      // Birthday reminders (5 days)
+      const birthday = new Date(customer.dateOfBirth);
+      const thisYearBirthday = new Date(now.getFullYear(), birthday.getMonth(), birthday.getDate());
+      const nextYearBirthday = new Date(now.getFullYear() + 1, birthday.getMonth(), birthday.getDate());
+      
+      const upcomingBirthday = thisYearBirthday >= now ? thisYearBirthday : nextYearBirthday;
+      const daysUntilBirthday = Math.ceil((upcomingBirthday.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (daysUntilBirthday >= 0 && daysUntilBirthday <= 5) {
+        reminders.push({
+          customerId: customer.id,
+          customerName: customer.fullName,
+          type: 'birthday',
+          daysUntil: daysUntilBirthday,
+          date: upcomingBirthday,
+          message: `Còn ${daysUntilBirthday} ngày nữa tới sinh nhật`,
+        });
+      }
+
+      // Payment reminders
+      customer.insuranceContracts.forEach(contract => {
+        const nextPayment = new Date(contract.nextPaymentDate);
+        const daysUntilPayment = Math.ceil((nextPayment.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        
+        if (daysUntilPayment < 0) {
+          // Overdue payment
+          const daysOverdue = Math.abs(daysUntilPayment);
+          reminders.push({
+            customerId: customer.id,
+            customerName: customer.fullName,
+            type: 'payment-overdue',
+            daysOverdue: daysOverdue,
+            date: nextPayment,
+            message: `Đã trễ phí ${daysOverdue} ngày - ${contract.company}`,
+          });
+        } else if (daysUntilPayment >= 0 && daysUntilPayment <= 30) {
+          // Upcoming payment (30 days)
+          reminders.push({
+            customerId: customer.id,
+            customerName: customer.fullName,
+            type: 'payment-due',
+            daysUntil: daysUntilPayment,
+            date: nextPayment,
+            message: `Còn ${daysUntilPayment} ngày nữa tới hạn đóng phí - ${contract.company}`,
+          });
+        }
+      });
+    });
+
+    return reminders.sort((a, b) => {
+      // Sort by urgency: overdue first, then by days
+      if (a.type === 'payment-overdue' && b.type !== 'payment-overdue') return -1;
+      if (a.type !== 'payment-overdue' && b.type === 'payment-overdue') return 1;
+      
+      const aDays = a.daysOverdue || a.daysUntil || 0;
+      const bDays = b.daysOverdue || b.daysUntil || 0;
+      return aDays - bDays;
+    });
+  };
+
   const calculateDashboardStats = (): DashboardStats => {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const reminders = calculateReminders();
 
     return {
       totalCustomers: customers.length,
@@ -176,10 +260,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       upcomingMeetings: customers.filter(c => 
         c.meetingRecords.some(m => m.date > now)
       ).length,
-      upcomingPayments: customers.filter(c => 
-        c.insuranceContracts.some(d => d.nextPaymentDate > now)
-      ).length,
+      upcomingPayments: reminders.filter(r => r.type === 'payment-due').length,
       newCustomersThisMonth: customers.filter(c => c.createdAt >= startOfMonth).length,
+      upcomingBirthdays: reminders.filter(r => r.type === 'birthday').length,
+      overduePayments: reminders.filter(r => r.type === 'payment-overdue').length,
     };
   };
 
@@ -240,6 +324,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         meetings,
         learningContent,
         dashboardStats: calculateDashboardStats(),
+        reminders: calculateReminders(),
         addCustomer,
         updateCustomer,
         deleteCustomer,

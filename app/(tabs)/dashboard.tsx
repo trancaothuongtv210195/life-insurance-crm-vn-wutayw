@@ -19,16 +19,7 @@ const { width } = Dimensions.get('window');
 
 export default function DashboardScreen() {
   const { user } = useAuth();
-  const { dashboardStats, customers } = useData();
-
-  const upcomingMeetings = customers
-    .filter(c => c.meetingDate && c.meetingDate > new Date())
-    .sort((a, b) => (a.meetingDate?.getTime() || 0) - (b.meetingDate?.getTime() || 0))
-    .slice(0, 3);
-
-  const upcomingPayments = customers
-    .filter(c => c.insuranceDetails?.some(d => d.nextPaymentDate > new Date()))
-    .slice(0, 3);
+  const { dashboardStats, customers, reminders } = useData();
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -41,9 +32,11 @@ export default function DashboardScreen() {
           </View>
           <TouchableOpacity style={styles.notificationButton}>
             <IconSymbol name="bell.fill" size={24} color={colors.primary} />
-            <View style={styles.notificationBadge}>
-              <Text style={styles.notificationBadgeText}>3</Text>
-            </View>
+            {reminders.length > 0 && (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>{reminders.length}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -85,82 +78,95 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Cuộc họp sắp tới</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAllText}>Xem tất cả</Text>
-            </TouchableOpacity>
-          </View>
-          {upcomingMeetings.length > 0 ? (
-            upcomingMeetings.map(customer => (
+        {/* Reminders Section */}
+        {reminders.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Nhắc nhở</Text>
+              <View style={styles.reminderCount}>
+                <Text style={styles.reminderCountText}>{reminders.length}</Text>
+              </View>
+            </View>
+            {reminders.slice(0, 5).map((reminder, index) => (
               <TouchableOpacity
-                key={customer.id}
-                style={styles.meetingCard}
-                onPress={() => router.push(`/customer/${customer.id}`)}
+                key={index}
+                style={[
+                  styles.reminderCard,
+                  reminder.type === 'payment-overdue' && styles.reminderCardUrgent,
+                ]}
+                onPress={() => router.push(`/customer/${reminder.customerId}`)}
               >
-                <View style={styles.meetingIcon}>
-                  <IconSymbol name="calendar" size={24} color={colors.primary} />
+                <View style={[
+                  styles.reminderIcon,
+                  reminder.type === 'birthday' && { backgroundColor: '#E3F2FD' },
+                  reminder.type === 'payment-due' && { backgroundColor: '#FFF8E1' },
+                  reminder.type === 'payment-overdue' && { backgroundColor: '#FFEBEE' },
+                ]}>
+                  <IconSymbol 
+                    name={
+                      reminder.type === 'birthday' ? 'gift' :
+                      reminder.type === 'payment-due' ? 'clock' :
+                      'exclamationmark.triangle'
+                    }
+                    size={24}
+                    color={
+                      reminder.type === 'birthday' ? colors.primary :
+                      reminder.type === 'payment-due' ? colors.accent :
+                      colors.error
+                    }
+                  />
                 </View>
-                <View style={styles.meetingInfo}>
-                  <Text style={styles.meetingName}>{customer.fullName}</Text>
-                  <Text style={styles.meetingDate}>
-                    {customer.meetingDate?.toLocaleDateString('vi-VN')}
+                <View style={styles.reminderInfo}>
+                  <Text style={styles.reminderName}>{reminder.customerName}</Text>
+                  <Text style={[
+                    styles.reminderMessage,
+                    reminder.type === 'payment-overdue' && styles.reminderMessageUrgent,
+                  ]}>
+                    {reminder.message}
                   </Text>
-                  {customer.meetingNotes && (
-                    <Text style={styles.meetingNotes} numberOfLines={1}>
-                      {customer.meetingNotes}
-                    </Text>
-                  )}
+                  <Text style={styles.reminderDate}>
+                    {reminder.date.toLocaleDateString('vi-VN')}
+                  </Text>
                 </View>
                 <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
               </TouchableOpacity>
-            ))
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>Không có cuộc họp sắp tới</Text>
-            </View>
-          )}
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Thanh toán sắp tới</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAllText}>Xem tất cả</Text>
-            </TouchableOpacity>
-          </View>
-          {upcomingPayments.length > 0 ? (
-            upcomingPayments.map(customer => (
-              <TouchableOpacity
-                key={customer.id}
-                style={styles.paymentCard}
-                onPress={() => router.push(`/customer/${customer.id}`)}
+            ))}
+            {reminders.length > 5 && (
+              <TouchableOpacity 
+                style={styles.seeAllButton}
+                onPress={() => router.push('/(tabs)/customers')}
               >
-                <View style={styles.paymentIcon}>
-                  <IconSymbol name="creditcard.fill" size={24} color={colors.accent} />
-                </View>
-                <View style={styles.paymentInfo}>
-                  <Text style={styles.paymentName}>{customer.fullName}</Text>
-                  {customer.insuranceDetails?.[0] && (
-                    <>
-                      <Text style={styles.paymentCompany}>
-                        {customer.insuranceDetails[0].company}
-                      </Text>
-                      <Text style={styles.paymentAmount}>
-                        {customer.insuranceDetails[0].premiumAmount.toLocaleString('vi-VN')} đ
-                      </Text>
-                    </>
-                  )}
-                </View>
-                <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
+                <Text style={styles.seeAllText}>Xem tất cả {reminders.length} nhắc nhở</Text>
               </TouchableOpacity>
-            ))
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>Không có thanh toán sắp tới</Text>
+            )}
+          </View>
+        )}
+
+        {/* Quick Stats */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Thống kê nhanh</Text>
+          <View style={styles.quickStatsGrid}>
+            <View style={styles.quickStatCard}>
+              <IconSymbol name="gift.fill" size={28} color={colors.primary} />
+              <Text style={styles.quickStatNumber}>{dashboardStats.upcomingBirthdays}</Text>
+              <Text style={styles.quickStatLabel}>Sinh nhật sắp tới</Text>
             </View>
-          )}
+            <View style={styles.quickStatCard}>
+              <IconSymbol name="clock.fill" size={28} color={colors.accent} />
+              <Text style={styles.quickStatNumber}>{dashboardStats.upcomingPayments}</Text>
+              <Text style={styles.quickStatLabel}>Sắp đóng phí</Text>
+            </View>
+            <View style={styles.quickStatCard}>
+              <IconSymbol name="exclamationmark.triangle.fill" size={28} color={colors.error} />
+              <Text style={styles.quickStatNumber}>{dashboardStats.overduePayments}</Text>
+              <Text style={styles.quickStatLabel}>Trễ phí</Text>
+            </View>
+            <View style={styles.quickStatCard}>
+              <IconSymbol name="calendar.badge.plus" size={28} color={colors.signed} />
+              <Text style={styles.quickStatNumber}>{dashboardStats.newCustomersThisMonth}</Text>
+              <Text style={styles.quickStatLabel}>KH mới tháng này</Text>
+            </View>
+          </View>
         </View>
 
         <View style={{ height: 100 }} />
@@ -215,11 +221,12 @@ const styles = StyleSheet.create({
     top: 8,
     right: 8,
     backgroundColor: colors.error,
-    width: 18,
+    minWidth: 18,
     height: 18,
     borderRadius: 9,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 4,
   },
   notificationBadgeText: {
     color: colors.secondary,
@@ -267,92 +274,94 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.text,
   },
+  reminderCount: {
+    backgroundColor: colors.error,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  reminderCountText: {
+    color: colors.secondary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  reminderCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.secondary,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.08)',
+    elevation: 2,
+  },
+  reminderCardUrgent: {
+    borderLeftWidth: 4,
+    borderLeftColor: colors.error,
+  },
+  reminderIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  reminderInfo: {
+    flex: 1,
+  },
+  reminderName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  reminderMessage: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 2,
+  },
+  reminderMessageUrgent: {
+    color: colors.error,
+    fontWeight: '600',
+  },
+  reminderDate: {
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+  seeAllButton: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
   seeAllText: {
     fontSize: 14,
     color: colors.primary,
     fontWeight: '600',
   },
-  meetingCard: {
+  quickStatsGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  quickStatCard: {
+    width: (width - 56) / 2,
     backgroundColor: colors.secondary,
     padding: 16,
     borderRadius: 12,
-    marginBottom: 12,
+    alignItems: 'center',
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.08)',
     elevation: 2,
   },
-  meetingIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.highlight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  meetingInfo: {
-    flex: 1,
-  },
-  meetingName: {
-    fontSize: 16,
-    fontWeight: '600',
+  quickStatNumber: {
+    fontSize: 24,
+    fontWeight: '700',
     color: colors.text,
-    marginBottom: 4,
+    marginTop: 8,
   },
-  meetingDate: {
-    fontSize: 14,
-    color: colors.primary,
-    marginBottom: 2,
-  },
-  meetingNotes: {
-    fontSize: 13,
+  quickStatLabel: {
+    fontSize: 12,
     color: colors.textSecondary,
-  },
-  paymentCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.secondary,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.08)',
-    elevation: 2,
-  },
-  paymentIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#FFF8E1',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  paymentInfo: {
-    flex: 1,
-  },
-  paymentName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 4,
-  },
-  paymentCompany: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginBottom: 2,
-  },
-  paymentAmount: {
-    fontSize: 15,
-    color: colors.accent,
-    fontWeight: '600',
-  },
-  emptyState: {
-    padding: 32,
-    alignItems: 'center',
-  },
-  emptyStateText: {
-    fontSize: 14,
-    color: colors.textSecondary,
+    marginTop: 4,
+    textAlign: 'center',
   },
 });
