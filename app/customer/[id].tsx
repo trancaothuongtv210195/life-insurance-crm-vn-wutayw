@@ -1,5 +1,4 @@
 
-import React from 'react';
 import {
   View,
   Text,
@@ -10,32 +9,37 @@ import {
   Linking,
   Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, router } from 'expo-router';
-import { useData } from '@/contexts/DataContext';
-import { useAuth } from '@/contexts/AuthContext';
-import { colors } from '@/styles/commonStyles';
-import { IconSymbol } from '@/components/IconSymbol';
 import { CustomerClassification } from '@/types';
+import React from 'react';
+import { IconSymbol } from '@/components/IconSymbol';
+import { colors } from '@/styles/commonStyles';
+import { useData } from '@/contexts/DataContext';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '@/contexts/AuthContext';
+import { useLocalSearchParams, router } from 'expo-router';
 
 export default function CustomerDetailScreen() {
   const { id } = useLocalSearchParams();
-  const { customers, deleteCustomer } = useData();
+  const { customers, updateCustomer } = useData();
   const { user } = useAuth();
-  
+
   const customer = customers.find(c => c.id === id);
 
   if (!customer) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Không tìm thấy khách hàng</Text>
+        <View style={styles.header}>
           <TouchableOpacity
-            style={styles.backButton}
+            style={styles.headerButton}
             onPress={() => router.back()}
           >
-            <Text style={styles.backButtonText}>Quay lại</Text>
+            <IconSymbol name="chevron.left" size={24} color={colors.text} />
           </TouchableOpacity>
+          <Text style={styles.headerTitle}>Chi tiết khách hàng</Text>
+          <View style={styles.headerButton} />
+        </View>
+        <View style={styles.content}>
+          <Text style={styles.message}>Không tìm thấy khách hàng</Text>
         </View>
       </SafeAreaView>
     );
@@ -45,27 +49,8 @@ export default function CustomerDetailScreen() {
     Linking.openURL(`tel:${customer.phoneNumber}`);
   };
 
-  const handleDelete = () => {
-    if (user?.role === 'Staff') {
-      Alert.alert('Không có quyền', 'Bạn không có quyền xóa khách hàng');
-      return;
-    }
-
-    Alert.alert(
-      'Xóa khách hàng',
-      `Bạn có chắc chắn muốn xóa ${customer.fullName}?`,
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Xóa',
-          style: 'destructive',
-          onPress: () => {
-            deleteCustomer(customer.id);
-            router.back();
-          },
-        },
-      ]
-    );
+  const handleEdit = () => {
+    router.push(`/customer/edit/${customer.id}`);
   };
 
   const getClassificationColor = (classification: CustomerClassification) => {
@@ -76,8 +61,6 @@ export default function CustomerDetailScreen() {
         return colors.potential;
       case 'Dropped':
         return colors.dropped;
-      default:
-        return colors.textSecondary;
     }
   };
 
@@ -88,10 +71,27 @@ export default function CustomerDetailScreen() {
       case 'Potential':
         return 'Tiềm năng';
       case 'Dropped':
-        return 'Đã bỏ';
-      default:
-        return classification;
+        return 'Loại bỏ';
     }
+  };
+
+  const getFrequencyLabel = (freq: string) => {
+    switch (freq) {
+      case 'month': return 'Tháng';
+      case 'quarter': return 'Quý';
+      case '6-month': return 'Nửa năm';
+      case 'year': return 'Năm';
+      default: return freq;
+    }
+  };
+
+  const formatAddress = () => {
+    const parts = [];
+    if (customer.address.hamlet) parts.push(customer.address.hamlet);
+    if (customer.address.commune) parts.push(customer.address.commune);
+    if (customer.address.district) parts.push(customer.address.district);
+    if (customer.address.city) parts.push(customer.address.city);
+    return parts.join(', ') || 'Chưa cập nhật';
   };
 
   return (
@@ -106,157 +106,191 @@ export default function CustomerDetailScreen() {
         <Text style={styles.headerTitle}>Chi tiết khách hàng</Text>
         <TouchableOpacity
           style={styles.headerButton}
-          onPress={() => router.push(`/customer/edit/${customer.id}`)}
+          onPress={handleEdit}
         >
           <IconSymbol name="pencil" size={24} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Avatar and Basic Info */}
         <View style={styles.profileSection}>
-          <View style={styles.avatarContainer}>
-            {customer.avatar ? (
-              <Image source={{ uri: customer.avatar }} style={styles.avatar} />
-            ) : (
-              <IconSymbol name="person.fill" size={64} color={colors.primary} />
-            )}
-          </View>
-          <Text style={styles.customerName}>{customer.fullName}</Text>
+          {customer.avatar ? (
+            <Image source={{ uri: customer.avatar }} style={styles.avatar} />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <IconSymbol name="person.circle.fill" size={80} color={colors.textSecondary} />
+            </View>
+          )}
+          <Text style={styles.name}>{customer.fullName}</Text>
           <View
             style={[
-              styles.statusBadge,
+              styles.badge,
               { backgroundColor: getClassificationColor(customer.classification) },
             ]}
           >
-            <Text style={styles.statusBadgeText}>
+            <Text style={styles.badgeText}>
               {getClassificationLabel(customer.classification)}
             </Text>
           </View>
         </View>
 
+        {/* Action Buttons */}
         <View style={styles.actionButtons}>
           <TouchableOpacity style={styles.actionButton} onPress={handleCall}>
             <IconSymbol name="phone.fill" size={24} color={colors.secondary} />
             <Text style={styles.actionButtonText}>Gọi điện</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton}>
-            <IconSymbol name="message.fill" size={24} color={colors.secondary} />
-            <Text style={styles.actionButtonText}>Nhắn tin</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton}>
-            <IconSymbol name="calendar" size={24} color={colors.secondary} />
-            <Text style={styles.actionButtonText}>Lịch hẹn</Text>
-          </TouchableOpacity>
+          {customer.location && (
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={() =>
+                Linking.openURL(
+                  `https://www.google.com/maps?q=${customer.location?.latitude},${customer.location?.longitude}`
+                )
+              }
+            >
+              <IconSymbol name="map.fill" size={24} color={colors.secondary} />
+              <Text style={styles.actionButtonText}>Bản đồ</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
+        {/* Contact Info */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Thông tin cơ bản</Text>
-          <View style={styles.infoCard}>
-            <View style={styles.infoRow}>
-              <IconSymbol name="phone" size={20} color={colors.textSecondary} />
-              <Text style={styles.infoLabel}>Số điện thoại</Text>
-              <Text style={styles.infoValue}>{customer.phoneNumber}</Text>
-            </View>
-            <View style={styles.infoDivider} />
-            <View style={styles.infoRow}>
-              <IconSymbol name="calendar" size={20} color={colors.textSecondary} />
-              <Text style={styles.infoLabel}>Ngày sinh</Text>
-              <Text style={styles.infoValue}>
-                {customer.dateOfBirth.toLocaleDateString('vi-VN')}
-              </Text>
-            </View>
-            {customer.occupation && (
-              <>
-                <View style={styles.infoDivider} />
-                <View style={styles.infoRow}>
-                  <IconSymbol name="briefcase" size={20} color={colors.textSecondary} />
-                  <Text style={styles.infoLabel}>Nghề nghiệp</Text>
-                  <Text style={styles.infoValue}>{customer.occupation}</Text>
-                </View>
-              </>
-            )}
-            {customer.address && (
-              <>
-                <View style={styles.infoDivider} />
-                <View style={styles.infoRow}>
-                  <IconSymbol name="location" size={20} color={colors.textSecondary} />
-                  <Text style={styles.infoLabel}>Địa chỉ</Text>
-                  <Text style={styles.infoValue}>
-                    {[
-                      customer.address.hamlet,
-                      customer.address.commune,
-                      customer.address.district,
-                      customer.address.city,
-                    ]
-                      .filter(Boolean)
-                      .join(', ')}
-                  </Text>
-                </View>
-              </>
-            )}
+          <Text style={styles.sectionTitle}>Thông tin liên hệ</Text>
+          <View style={styles.infoRow}>
+            <IconSymbol name="phone" size={20} color={colors.primary} />
+            <Text style={styles.infoLabel}>Số điện thoại:</Text>
+            <Text style={styles.infoValue}>{customer.phoneNumber}</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <IconSymbol name="calendar" size={20} color={colors.primary} />
+            <Text style={styles.infoLabel}>Ngày sinh:</Text>
+            <Text style={styles.infoValue}>
+              {customer.dateOfBirth.toLocaleDateString('vi-VN')}
+            </Text>
+          </View>
+          <View style={styles.infoRow}>
+            <IconSymbol name="location" size={20} color={colors.primary} />
+            <Text style={styles.infoLabel}>Địa chỉ:</Text>
+            <Text style={styles.infoValue}>{formatAddress()}</Text>
           </View>
         </View>
 
-        {customer.insuranceDetails && customer.insuranceDetails.length > 0 && (
+        {/* Additional Info */}
+        {(customer.occupation || customer.financialStatus || customer.familyInfo) && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Thông tin bảo hiểm</Text>
-            {customer.insuranceDetails.map((insurance, index) => (
-              <View key={index} style={styles.insuranceCard}>
-                <View style={styles.insuranceHeader}>
-                  <Text style={styles.insuranceCompany}>{insurance.company}</Text>
-                  <Text style={styles.insuranceContract}>{insurance.contractNumber}</Text>
+            <Text style={styles.sectionTitle}>Thông tin bổ sung</Text>
+            {customer.occupation && (
+              <View style={styles.infoRow}>
+                <IconSymbol name="briefcase" size={20} color={colors.primary} />
+                <Text style={styles.infoLabel}>Nghề nghiệp:</Text>
+                <Text style={styles.infoValue}>{customer.occupation}</Text>
+              </View>
+            )}
+            {customer.financialStatus && (
+              <View style={styles.detailBlock}>
+                <Text style={styles.detailLabel}>Tình trạng kinh tế:</Text>
+                <Text style={styles.detailValue}>{customer.financialStatus}</Text>
+              </View>
+            )}
+            {customer.familyInfo && (
+              <View style={styles.detailBlock}>
+                <Text style={styles.detailLabel}>Thông tin gia đình:</Text>
+                <Text style={styles.detailValue}>{customer.familyInfo}</Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Meeting History */}
+        {customer.meetingRecords && customer.meetingRecords.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Lịch sử gặp mặt</Text>
+            {customer.meetingRecords.map((meeting, index) => (
+              <View key={meeting.id} style={styles.meetingCard}>
+                <View style={styles.meetingHeader}>
+                  <Text style={styles.meetingTitle}>Lần {index + 1}</Text>
+                  <Text style={styles.meetingDate}>
+                    {meeting.date.toLocaleDateString('vi-VN')}
+                  </Text>
                 </View>
-                <Text style={styles.insurancePolicy}>{insurance.policyDetails}</Text>
-                <View style={styles.insuranceDetails}>
-                  <View style={styles.insuranceDetailItem}>
-                    <Text style={styles.insuranceDetailLabel}>Phí bảo hiểm</Text>
-                    <Text style={styles.insuranceDetailValue}>
-                      {insurance.premiumAmount.toLocaleString('vi-VN')} đ
-                    </Text>
-                  </View>
-                  <View style={styles.insuranceDetailItem}>
-                    <Text style={styles.insuranceDetailLabel}>Tần suất</Text>
-                    <Text style={styles.insuranceDetailValue}>
-                      {insurance.paymentFrequency === 'month' && 'Hàng tháng'}
-                      {insurance.paymentFrequency === 'quarter' && 'Hàng quý'}
-                      {insurance.paymentFrequency === '6-month' && '6 tháng'}
-                      {insurance.paymentFrequency === 'year' && 'Hàng năm'}
-                    </Text>
-                  </View>
-                  <View style={styles.insuranceDetailItem}>
-                    <Text style={styles.insuranceDetailLabel}>Thanh toán tiếp theo</Text>
-                    <Text style={styles.insuranceDetailValue}>
-                      {insurance.nextPaymentDate.toLocaleDateString('vi-VN')}
-                    </Text>
-                  </View>
-                </View>
+                <Text style={styles.meetingNotes}>{meeting.notes}</Text>
               </View>
             ))}
           </View>
         )}
 
-        {customer.meetingDate && (
+        {/* Files */}
+        {customer.files && customer.files.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Cuộc họp</Text>
-            <View style={styles.meetingCard}>
-              <View style={styles.meetingHeader}>
-                <IconSymbol name="calendar" size={24} color={colors.primary} />
-                <Text style={styles.meetingDate}>
-                  {customer.meetingDate.toLocaleDateString('vi-VN')}
-                </Text>
-              </View>
-              {customer.meetingNotes && (
-                <Text style={styles.meetingNotes}>{customer.meetingNotes}</Text>
-              )}
+            <Text style={styles.sectionTitle}>Tệp đính kèm</Text>
+            <View style={styles.filesList}>
+              {customer.files.map((file) => (
+                <View key={file.id} style={styles.fileItem}>
+                  <IconSymbol
+                    name={file.type === 'video' ? 'video.fill' : 'photo.fill'}
+                    size={24}
+                    color={colors.primary}
+                  />
+                  <Text style={styles.fileName} numberOfLines={1}>
+                    {file.name}
+                  </Text>
+                </View>
+              ))}
             </View>
           </View>
         )}
 
-        {user?.role !== 'Staff' && (
-          <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
-            <IconSymbol name="trash" size={20} color={colors.error} />
-            <Text style={styles.deleteButtonText}>Xóa khách hàng</Text>
-          </TouchableOpacity>
+        {/* Insurance Info */}
+        {customer.hasInsurance && customer.insuranceContracts.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Thông tin bảo hiểm</Text>
+            {customer.insuranceContracts.map((contract, index) => (
+              <View key={contract.id} style={styles.insuranceCard}>
+                <Text style={styles.insuranceTitle}>Hợp đồng {index + 1}</Text>
+                <View style={styles.insuranceDetail}>
+                  <Text style={styles.insuranceLabel}>Công ty:</Text>
+                  <Text style={styles.insuranceValue}>{contract.company}</Text>
+                </View>
+                <View style={styles.insuranceDetail}>
+                  <Text style={styles.insuranceLabel}>Số HĐ:</Text>
+                  <Text style={styles.insuranceValue}>{contract.contractNumber}</Text>
+                </View>
+                {contract.policyDetails && (
+                  <View style={styles.insuranceDetail}>
+                    <Text style={styles.insuranceLabel}>Chi tiết:</Text>
+                    <Text style={styles.insuranceValue}>{contract.policyDetails}</Text>
+                  </View>
+                )}
+                <View style={styles.insuranceDetail}>
+                  <Text style={styles.insuranceLabel}>Ngày tham gia:</Text>
+                  <Text style={styles.insuranceValue}>
+                    {contract.joinDate.toLocaleDateString('vi-VN')}
+                  </Text>
+                </View>
+                <View style={styles.insuranceDetail}>
+                  <Text style={styles.insuranceLabel}>Phí:</Text>
+                  <Text style={styles.insuranceValue}>
+                    {contract.premiumAmounts} VNĐ
+                  </Text>
+                </View>
+                <View style={styles.insuranceDetail}>
+                  <Text style={styles.insuranceLabel}>Định kỳ:</Text>
+                  <Text style={styles.insuranceValue}>
+                    {getFrequencyLabel(contract.paymentFrequency)}
+                  </Text>
+                </View>
+                <View style={styles.insuranceDetail}>
+                  <Text style={styles.insuranceLabel}>Đóng phí tiếp theo:</Text>
+                  <Text style={[styles.insuranceValue, { color: colors.accent }]}>
+                    {contract.nextPaymentDate.toLocaleDateString('vi-VN')}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
         )}
 
         <View style={{ height: 100 }} />
@@ -281,7 +315,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   headerButton: {
-    width: 40,
+    width: 60,
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
@@ -291,6 +325,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.text,
   },
+  content: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  message: {
+    fontSize: 16,
+    color: colors.textSecondary,
+  },
   scrollView: {
     flex: 1,
   },
@@ -298,205 +341,174 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 32,
     backgroundColor: colors.secondary,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  avatar: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     marginBottom: 16,
   },
-  avatarContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: colors.highlight,
+  avatarPlaceholder: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: colors.border,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
-    overflow: 'hidden',
   },
-  avatar: {
-    width: '100%',
-    height: '100%',
-  },
-  customerName: {
+  name: {
     fontSize: 24,
     fontWeight: '700',
     color: colors.text,
-    marginBottom: 12,
+    marginBottom: 8,
   },
-  statusBadge: {
-    paddingVertical: 6,
+  badge: {
     paddingHorizontal: 16,
-    borderRadius: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
-  statusBadgeText: {
-    color: colors.secondary,
+  badgeText: {
     fontSize: 14,
     fontWeight: '600',
+    color: colors.secondary,
   },
   actionButtons: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    marginBottom: 16,
+    padding: 20,
     gap: 12,
   },
   actionButton: {
     flex: 1,
-    backgroundColor: colors.primary,
-    paddingVertical: 12,
-    borderRadius: 12,
+    flexDirection: 'row',
     alignItems: 'center',
-    boxShadow: '0px 2px 8px rgba(25, 118, 210, 0.3)',
-    elevation: 3,
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
   },
   actionButtonText: {
-    color: colors.secondary,
-    fontSize: 12,
+    fontSize: 16,
     fontWeight: '600',
-    marginTop: 4,
+    color: colors.secondary,
   },
   section: {
     paddingHorizontal: 20,
-    marginBottom: 24,
+    paddingTop: 24,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: colors.text,
-    marginBottom: 12,
-  },
-  infoCard: {
-    backgroundColor: colors.secondary,
-    borderRadius: 12,
-    padding: 16,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.08)',
-    elevation: 2,
+    marginBottom: 16,
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    marginBottom: 16,
+    gap: 12,
   },
   infoLabel: {
-    flex: 1,
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginLeft: 12,
-  },
-  infoValue: {
     fontSize: 14,
     fontWeight: '600',
+    color: colors.textSecondary,
+    width: 120,
+  },
+  infoValue: {
+    flex: 1,
+    fontSize: 14,
     color: colors.text,
-    textAlign: 'right',
   },
-  infoDivider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginVertical: 8,
+  detailBlock: {
+    marginBottom: 16,
   },
-  insuranceCard: {
+  detailLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    marginBottom: 6,
+  },
+  detailValue: {
+    fontSize: 14,
+    color: colors.text,
+    lineHeight: 20,
+  },
+  meetingCard: {
     backgroundColor: colors.secondary,
-    borderRadius: 12,
     padding: 16,
+    borderRadius: 12,
     marginBottom: 12,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.08)',
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  insuranceHeader: {
+  meetingHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
   },
-  insuranceCompany: {
+  meetingTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: colors.primary,
-  },
-  insuranceContract: {
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  insurancePolicy: {
-    fontSize: 14,
     color: colors.text,
-    marginBottom: 12,
-  },
-  insuranceDetails: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  insuranceDetailItem: {
-    flex: 1,
-    minWidth: '45%',
-  },
-  insuranceDetailLabel: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginBottom: 4,
-  },
-  insuranceDetailValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  meetingCard: {
-    backgroundColor: colors.secondary,
-    borderRadius: 12,
-    padding: 16,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.08)',
-    elevation: 2,
-  },
-  meetingHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
   },
   meetingDate: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text,
-    marginLeft: 12,
+    fontSize: 14,
+    color: colors.textSecondary,
   },
   meetingNotes: {
     fontSize: 14,
-    color: colors.textSecondary,
+    color: colors.text,
     lineHeight: 20,
   },
-  deleteButton: {
+  filesList: {
+    gap: 12,
+  },
+  fileItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     backgroundColor: colors.secondary,
-    marginHorizontal: 20,
     padding: 16,
     borderRadius: 12,
+    gap: 12,
     borderWidth: 1,
-    borderColor: colors.error,
+    borderColor: colors.border,
   },
-  deleteButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.error,
-    marginLeft: 8,
-  },
-  errorContainer: {
+  fileName: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
+    fontSize: 14,
+    color: colors.text,
   },
-  errorText: {
-    fontSize: 16,
-    color: colors.textSecondary,
-    marginBottom: 20,
-  },
-  backButton: {
-    backgroundColor: colors.primary,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+  insuranceCard: {
+    backgroundColor: colors.secondary,
+    padding: 16,
     borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  backButtonText: {
-    color: colors.secondary,
+  insuranceTitle: {
     fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 12,
+  },
+  insuranceDetail: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  insuranceLabel: {
+    fontSize: 14,
     fontWeight: '600',
+    color: colors.textSecondary,
+    width: 140,
+  },
+  insuranceValue: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.text,
   },
 });

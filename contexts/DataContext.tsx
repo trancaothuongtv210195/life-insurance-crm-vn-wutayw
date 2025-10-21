@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Customer, Meeting, LearningContent, DashboardStats } from '@/types';
+import { Customer, Meeting, LearningContent, DashboardStats, InsuranceContract, MeetingRecord } from '@/types';
 
 interface DataContextType {
   customers: Customer[];
@@ -12,6 +12,8 @@ interface DataContextType {
   deleteCustomer: (id: string) => void;
   addMeeting: (meeting: Omit<Meeting, 'id' | 'createdAt'>) => void;
   addLearningContent: (content: Omit<LearningContent, 'id' | 'createdAt'>) => void;
+  checkPhoneNumberExists: (phoneNumber: string, excludeId?: string) => boolean;
+  checkContractNumberExists: (contractNumber: string, excludeId?: string) => boolean;
   isLoading: boolean;
 }
 
@@ -36,23 +38,42 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         phoneNumber: '0901234567',
         dateOfBirth: new Date('1985-05-15'),
         address: {
-          commune: 'Phường 1',
+          commune: 'Phường Tân Định',
           district: 'Quận 1',
           city: 'TP. Hồ Chí Minh',
         },
         occupation: 'Kỹ sư',
+        financialStatus: 'Thu nhập ổn định 20-30 triệu/tháng',
+        familyInfo: 'Đã kết hôn, có 2 con',
         classification: 'Signed',
-        insuranceDetails: [
+        hasInsurance: true,
+        insuranceContracts: [
           {
-            company: 'Prudential',
+            id: '1',
+            company: 'Prudential Việt Nam',
             contractNumber: 'PRU001234',
-            policyDetails: 'Bảo hiểm nhân thọ 20 năm',
+            policyDetails: 'Bảo hiểm nhân thọ 20 năm, quyền lợi 500 triệu',
             joinDate: new Date('2023-01-15'),
-            premiumAmount: 5000000,
+            premiumAmounts: '5000000',
             paymentFrequency: 'month',
             nextPaymentDate: new Date('2024-02-15'),
           },
         ],
+        meetingRecords: [
+          {
+            id: '1',
+            date: new Date('2023-01-10'),
+            notes: 'Gặp lần đầu, tư vấn về bảo hiểm nhân thọ',
+            createdAt: new Date('2023-01-10'),
+          },
+          {
+            id: '2',
+            date: new Date('2023-01-14'),
+            notes: 'Khách hàng đồng ý ký hợp đồng',
+            createdAt: new Date('2023-01-14'),
+          },
+        ],
+        files: [],
         createdBy: '1',
         createdAt: new Date('2023-01-10'),
         updatedAt: new Date('2023-01-10'),
@@ -63,14 +84,25 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         phoneNumber: '0912345678',
         dateOfBirth: new Date('1990-08-20'),
         address: {
-          commune: 'Xã Tân Phú',
+          commune: 'Xã Tân Phú Trung',
           district: 'Huyện Củ Chi',
           city: 'TP. Hồ Chí Minh',
         },
         occupation: 'Giáo viên',
+        financialStatus: 'Thu nhập 15 triệu/tháng',
+        familyInfo: 'Độc thân',
         classification: 'Potential',
-        meetingDate: new Date('2024-01-25'),
-        meetingNotes: 'Quan tâm đến gói bảo hiểm sức khỏe',
+        hasInsurance: false,
+        insuranceContracts: [],
+        meetingRecords: [
+          {
+            id: '1',
+            date: new Date('2024-01-25'),
+            notes: 'Quan tâm đến gói bảo hiểm sức khỏe',
+            createdAt: new Date('2024-01-25'),
+          },
+        ],
+        files: [],
         createdBy: '1',
         createdAt: new Date('2024-01-15'),
         updatedAt: new Date('2024-01-15'),
@@ -86,6 +118,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         },
         occupation: 'Kinh doanh',
         classification: 'Dropped',
+        hasInsurance: false,
+        insuranceContracts: [],
+        meetingRecords: [],
+        files: [],
         createdBy: '1',
         createdAt: new Date('2023-12-01'),
         updatedAt: new Date('2024-01-05'),
@@ -111,6 +147,16 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         createdBy: '1',
         createdAt: new Date('2024-01-10'),
       },
+      {
+        id: '3',
+        title: 'Kỹ thuật chốt sale hiệu quả',
+        description: 'Các phương pháp và kỹ thuật để chốt hợp đồng thành công',
+        type: 'video',
+        url: 'https://example.com/video2',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=400',
+        createdBy: '1',
+        createdAt: new Date('2024-01-05'),
+      },
     ];
 
     setCustomers(demoCustomers);
@@ -127,12 +173,26 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       signedCount: customers.filter(c => c.classification === 'Signed').length,
       potentialCount: customers.filter(c => c.classification === 'Potential').length,
       droppedCount: customers.filter(c => c.classification === 'Dropped').length,
-      upcomingMeetings: customers.filter(c => c.meetingDate && c.meetingDate > now).length,
+      upcomingMeetings: customers.filter(c => 
+        c.meetingRecords.some(m => m.date > now)
+      ).length,
       upcomingPayments: customers.filter(c => 
-        c.insuranceDetails?.some(d => d.nextPaymentDate > now)
+        c.insuranceContracts.some(d => d.nextPaymentDate > now)
       ).length,
       newCustomersThisMonth: customers.filter(c => c.createdAt >= startOfMonth).length,
     };
+  };
+
+  const checkPhoneNumberExists = (phoneNumber: string, excludeId?: string): boolean => {
+    return customers.some(c => c.phoneNumber === phoneNumber && c.id !== excludeId);
+  };
+
+  const checkContractNumberExists = (contractNumber: string, excludeId?: string): boolean => {
+    return customers.some(c => 
+      c.insuranceContracts.some(contract => 
+        contract.contractNumber === contractNumber
+      ) && c.id !== excludeId
+    );
   };
 
   const addCustomer = (customer: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -185,6 +245,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         deleteCustomer,
         addMeeting,
         addLearningContent,
+        checkPhoneNumberExists,
+        checkContractNumberExists,
         isLoading,
       }}
     >

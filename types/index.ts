@@ -9,6 +9,7 @@ export interface User {
   phoneNumber?: string;
   avatar?: string;
   createdBy?: string;
+  managerId?: string;
   createdAt: Date;
 }
 
@@ -16,14 +17,35 @@ export type CustomerClassification = 'Signed' | 'Potential' | 'Dropped';
 
 export type PaymentFrequency = 'month' | 'quarter' | '6-month' | 'year';
 
-export interface InsuranceDetail {
+export interface InsuranceCompany {
+  id: string;
+  name: string;
+}
+
+export interface InsuranceContract {
+  id: string;
   company: string;
   contractNumber: string;
   policyDetails: string;
   joinDate: Date;
-  premiumAmount: number;
+  premiumAmounts: string; // Comma-separated amounts
   paymentFrequency: PaymentFrequency;
   nextPaymentDate: Date;
+}
+
+export interface MeetingRecord {
+  id: string;
+  date: Date;
+  notes: string;
+  createdAt: Date;
+}
+
+export interface FileAttachment {
+  id: string;
+  uri: string;
+  type: 'image' | 'video';
+  name: string;
+  size?: number;
 }
 
 export interface Customer {
@@ -38,6 +60,7 @@ export interface Customer {
     district?: string;
     province?: string;
     city?: string;
+    fullAddress?: string;
   };
   occupation?: string;
   financialStatus?: string;
@@ -45,12 +68,13 @@ export interface Customer {
   location?: {
     latitude: number;
     longitude: number;
+    address?: string;
   };
-  meetingDate?: Date;
-  meetingNotes?: string;
-  files?: string[];
+  meetingRecords: MeetingRecord[];
+  files: FileAttachment[];
+  hasInsurance: boolean;
+  insuranceContracts: InsuranceContract[];
   classification: CustomerClassification;
-  insuranceDetails?: InsuranceDetail[];
   createdBy: string;
   createdAt: Date;
   updatedAt: Date;
@@ -84,4 +108,22 @@ export interface DashboardStats {
   upcomingMeetings: number;
   upcomingPayments: number;
   newCustomersThisMonth: number;
+}
+
+// Vietnamese address data
+export interface Province {
+  code: string;
+  name: string;
+}
+
+export interface District {
+  code: string;
+  name: string;
+  provinceCode: string;
+}
+
+export interface Commune {
+  code: string;
+  name: string;
+  districtCode: string;
 }
