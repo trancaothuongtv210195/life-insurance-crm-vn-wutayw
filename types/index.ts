@@ -4,6 +4,7 @@ export type UserRole = 'Admin' | 'Manager' | 'Staff';
 export interface User {
   id: string;
   email: string;
+  password: string;
   fullName: string;
   role: UserRole;
   phoneNumber?: string;
@@ -11,6 +12,7 @@ export interface User {
   createdBy?: string;
   managerId?: string;
   createdAt: Date;
+  updatedAt?: Date;
 }
 
 export type CustomerClassification = 'Signed' | 'Potential' | 'Dropped';
@@ -65,7 +67,7 @@ export interface Customer {
   occupation?: string;
   financialStatus?: string;
   familyInfo?: string;
-  location?: string; // Changed to single coordinate string
+  location?: string;
   meetingRecords: MeetingRecord[];
   files: FileAttachment[];
   hasInsurance: boolean;
@@ -89,8 +91,9 @@ export interface LearningContent {
   id: string;
   title: string;
   description: string;
+  content?: string;
   type: 'video' | 'pdf' | 'announcement';
-  url?: string;
+  videoUrl?: string;
   thumbnailUrl?: string;
   createdBy: string;
   createdAt: Date;
@@ -112,13 +115,12 @@ export interface CustomerReminder {
   customerId: string;
   customerName: string;
   type: 'birthday' | 'payment-due' | 'payment-overdue';
-  daysUntil?: number; // For birthday and payment-due
-  daysOverdue?: number; // For payment-overdue
+  daysUntil?: number;
+  daysOverdue?: number;
   date: Date;
   message: string;
 }
 
-// Vietnamese address data
 export interface Province {
   code: string;
   name: string;

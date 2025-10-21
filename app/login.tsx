@@ -10,7 +10,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Image,
 } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { router } from 'expo-router';
@@ -33,8 +32,8 @@ export default function LoginScreen() {
       setIsLoading(true);
       await login(email, password);
       router.replace('/(tabs)/dashboard');
-    } catch (error) {
-      Alert.alert('Lỗi đăng nhập', 'Email hoặc mật khẩu không đúng');
+    } catch (error: any) {
+      Alert.alert('Lỗi đăng nhập', error.message || 'Email hoặc mật khẩu không đúng');
     } finally {
       setIsLoading(false);
     }
@@ -54,12 +53,15 @@ export default function LoginScreen() {
             <IconSymbol name="shield.fill" size={60} color={colors.primary} />
           </View>
           <Text style={styles.title}>Life Insurance CRM</Text>
-          <Text style={styles.subtitle}>Quản lý khách hàng bảo hiểm</Text>
+          <Text style={styles.subtitle}>Quản lý khách hàng bảo hiểm nhân thọ</Text>
         </View>
 
         <View style={styles.form}>
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Email</Text>
+            <View style={styles.labelRow}>
+              <IconSymbol name="envelope.fill" size={18} color={colors.primary} />
+              <Text style={styles.label}>Email</Text>
+            </View>
             <TextInput
               style={styles.input}
               placeholder="Nhập email của bạn"
@@ -73,7 +75,10 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Mật khẩu</Text>
+            <View style={styles.labelRow}>
+              <IconSymbol name="lock.fill" size={18} color={colors.primary} />
+              <Text style={styles.label}>Mật khẩu</Text>
+            </View>
             <TextInput
               style={styles.input}
               placeholder="Nhập mật khẩu"
@@ -90,17 +95,26 @@ export default function LoginScreen() {
             onPress={handleLogin}
             disabled={isLoading}
           >
+            <IconSymbol 
+              name={isLoading ? "arrow.clockwise" : "arrow.right.circle.fill"} 
+              size={24} 
+              color={colors.secondary} 
+            />
             <Text style={styles.loginButtonText}>
               {isLoading ? 'Đang đăng nhập...' : 'Đăng nhập'}
             </Text>
           </TouchableOpacity>
 
           <View style={styles.demoInfo}>
-            <Text style={styles.demoTitle}>Tài khoản demo:</Text>
-            <Text style={styles.demoText}>• Admin: admin@example.com</Text>
-            <Text style={styles.demoText}>• Manager: manager@example.com</Text>
-            <Text style={styles.demoText}>• Staff: staff@example.com</Text>
-            <Text style={styles.demoText}>Mật khẩu: bất kỳ</Text>
+            <View style={styles.demoHeader}>
+              <IconSymbol name="info.circle.fill" size={20} color={colors.primary} />
+              <Text style={styles.demoTitle}>Tài khoản mặc định</Text>
+            </View>
+            <View style={styles.demoItem}>
+              <IconSymbol name="person.badge.shield.checkmark.fill" size={16} color={colors.accent} />
+              <Text style={styles.demoText}>Admin: admin@insurance.vn</Text>
+            </View>
+            <Text style={styles.demoPassword}>Mật khẩu: admin123</Text>
           </View>
         </View>
       </ScrollView>
@@ -123,16 +137,18 @@ const styles = StyleSheet.create({
     marginBottom: 48,
   },
   logoContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     backgroundColor: colors.highlight,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 24,
+    boxShadow: '0px 8px 24px rgba(25, 118, 210, 0.3)',
+    elevation: 8,
   },
   title: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: '700',
     color: colors.text,
     marginBottom: 8,
@@ -149,11 +165,16 @@ const styles = StyleSheet.create({
   inputContainer: {
     marginBottom: 20,
   },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 8,
+  },
   label: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
     color: colors.text,
-    marginBottom: 8,
   },
   input: {
     backgroundColor: colors.secondary,
@@ -173,6 +194,9 @@ const styles = StyleSheet.create({
     marginTop: 8,
     boxShadow: '0px 4px 12px rgba(25, 118, 210, 0.3)',
     elevation: 4,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
   },
   loginButtonDisabled: {
     opacity: 0.6,
@@ -184,19 +208,36 @@ const styles = StyleSheet.create({
   },
   demoInfo: {
     marginTop: 32,
-    padding: 16,
+    padding: 20,
     backgroundColor: colors.highlight,
-    borderRadius: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  demoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
   },
   demoTitle: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
     color: colors.text,
-    marginBottom: 8,
+  },
+  demoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
   },
   demoText: {
-    fontSize: 13,
+    fontSize: 14,
+    color: colors.text,
+  },
+  demoPassword: {
+    fontSize: 14,
     color: colors.textSecondary,
-    marginBottom: 4,
+    marginLeft: 24,
   },
 });

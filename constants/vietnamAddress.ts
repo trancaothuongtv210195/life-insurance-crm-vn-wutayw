@@ -66,7 +66,7 @@ export const provinces = [
   { code: '96', name: 'Cà Mau' },
 ];
 
-// Sample districts for major cities (can be expanded)
+// Sample districts for major cities
 export const districts: { [key: string]: { code: string; name: string }[] } = {
   '79': [ // TP. HCM
     { code: '760', name: 'Quận 1' },
@@ -138,7 +138,7 @@ export const districts: { [key: string]: { code: string; name: string }[] } = {
   ],
 };
 
-// Sample communes (can be expanded)
+// Sample communes/wards
 export const communes: { [key: string]: { code: string; name: string }[] } = {
   '760': [ // Quận 1
     { code: '26734', name: 'Phường Tân Định' },
@@ -174,6 +174,24 @@ export const communes: { [key: string]: { code: string; name: string }[] } = {
     { code: '27604', name: 'Xã Bình Mỹ' },
     { code: '27607', name: 'Xã Tân Phú Trung' },
     { code: '27610', name: 'Xã Tân Thông Hội' },
+  ],
+};
+
+// Sample hamlets for communes
+export const hamlets: { [key: string]: string[] } = {
+  '27607': [ // Xã Tân Phú Trung
+    'Ấp 1',
+    'Ấp 2',
+    'Ấp 3',
+    'Ấp 4',
+    'Ấp 5',
+    'Ấp 6',
+  ],
+  '26734': [ // Phường Tân Định
+    'Khu phố 1',
+    'Khu phố 2',
+    'Khu phố 3',
+    'Khu phố 4',
   ],
 };
 
