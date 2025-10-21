@@ -51,8 +51,7 @@ export default function EditCustomerScreen() {
   const [occupation, setOccupation] = useState('');
   const [financialStatus, setFinancialStatus] = useState('');
   const [familyInfo, setFamilyInfo] = useState('');
-  const [locationLat, setLocationLat] = useState('');
-  const [locationLng, setLocationLng] = useState('');
+  const [locationCoordinates, setLocationCoordinates] = useState('');
   
   // Meeting records
   const [meetingRecords, setMeetingRecords] = useState<MeetingRecord[]>([]);
@@ -99,9 +98,9 @@ export default function EditCustomerScreen() {
       setMeetingRecords(customer.meetingRecords);
       setFiles(customer.files);
       
+      // Convert location object to coordinate string
       if (customer.location) {
-        setLocationLat(customer.location.latitude.toString());
-        setLocationLng(customer.location.longitude.toString());
+        setLocationCoordinates(`${customer.location.latitude}, ${customer.location.longitude}`);
       }
 
       // Find province code from name
@@ -228,21 +227,27 @@ export default function EditCustomerScreen() {
       Alert.alert('Lỗi', 'Vui lòng chọn công ty bảo hiểm');
       return;
     }
-    if (!currentContractNumber) {
+    if (!currentContractNumber.trim()) {
       Alert.alert('Lỗi', 'Vui lòng nhập số hợp đồng');
       return;
     }
     
     // Check duplicate contract number (excluding current customer)
-    if (checkContractNumberExists(currentContractNumber, customer.id)) {
+    if (checkContractNumberExists(currentContractNumber.trim(), customer.id)) {
       Alert.alert('Cảnh báo', 'Số hợp đồng này đã tồn tại trong hệ thống');
+      return;
+    }
+    
+    // Check duplicate within current contracts
+    if (insuranceContracts.some(c => c.contractNumber === currentContractNumber.trim())) {
+      Alert.alert('Cảnh báo', 'Số hợp đồng này đã được thêm vào danh sách');
       return;
     }
     
     const newContract: InsuranceContract = {
       id: Date.now().toString(),
       company: currentCompany,
-      contractNumber: currentContractNumber,
+      contractNumber: currentContractNumber.trim(),
       policyDetails: currentPolicyDetails,
       joinDate: currentJoinDate,
       premiumAmounts: currentPremiumAmounts,
@@ -276,7 +281,7 @@ export default function EditCustomerScreen() {
     }
 
     // Check for duplicate phone number (excluding current customer)
-    if (checkPhoneNumberExists(phoneNumber, customer.id)) {
+    if (checkPhoneNumberExists(phoneNumber.trim(), customer.id)) {
       Alert.alert('Cảnh báo', 'Số điện thoại này đã tồn tại trong hệ thống. Vui lòng kiểm tra lại.');
       return;
     }
@@ -285,10 +290,18 @@ export default function EditCustomerScreen() {
     const districtName = districts[selectedProvince]?.find(d => d.code === selectedDistrict)?.name || '';
     const communeName = communes[selectedDistrict]?.find(c => c.code === selectedCommune)?.name || '';
 
-    const location = locationLat && locationLng ? {
-      latitude: parseFloat(locationLat),
-      longitude: parseFloat(locationLng),
-    } : undefined;
+    // Parse location coordinates
+    let location = undefined;
+    if (locationCoordinates.trim()) {
+      const coords = locationCoordinates.trim().split(',').map(c => c.trim());
+      if (coords.length === 2) {
+        const lat = parseFloat(coords[0]);
+        const lng = parseFloat(coords[1]);
+        if (!isNaN(lat) && !isNaN(lng)) {
+          location = { latitude: lat, longitude: lng };
+        }
+      }
+    }
 
     const updates: Partial<Customer> = {
       avatar,
@@ -325,6 +338,12 @@ export default function EditCustomerScreen() {
       case 'quarter': return 'Quý';
       case '6-month': return 'Nửa năm';
       case 'year': return 'Năm';
+    }
+  };
+
+  const openMapLocation = () => {
+    if (locationCoordinates.trim()) {
+      Linking.openURL(`https://www.google.com/maps?q=${locationCoordinates.trim()}`);
     }
   };
 
@@ -386,7 +405,7 @@ export default function EditCustomerScreen() {
             </View>
 
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Số điện thoại *</Text>
+              <Text style={styles.label}>Số điện thoại * (không được trùng)</Text>
               <View style={styles.phoneContainer}>
                 <TextInput
                   style={[styles.input, { flex: 1 }]}
@@ -468,9 +487,9 @@ export default function EditCustomerScreen() {
             </View>
           </View>
 
-          {/* Address - Similar to add screen */}
+          {/* Address */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Địa chỉ</Text>
+            <Text style={styles.sectionTitle}>Địa chỉ chi tiết</Text>
             
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Tỉnh/Thành phố</Text>
@@ -527,35 +546,25 @@ export default function EditCustomerScreen() {
           {/* Location */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Vị trí (Google Maps)</Text>
+            <Text style={styles.helperText}>
+              Copy toàn bộ tọa độ từ Google Maps (VD: 10.762622, 106.660172)
+            </Text>
             
-            <View style={styles.row}>
-              <View style={[styles.inputContainer, { flex: 1, marginRight: 8 }]}>
-                <Text style={styles.label}>Vĩ độ</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="10.762622"
-                  placeholderTextColor={colors.textSecondary}
-                  value={locationLat}
-                  onChangeText={setLocationLat}
-                  keyboardType="decimal-pad"
-                />
-              </View>
-              <View style={[styles.inputContainer, { flex: 1, marginLeft: 8 }]}>
-                <Text style={styles.label}>Kinh độ</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="106.660172"
-                  placeholderTextColor={colors.textSecondary}
-                  value={locationLng}
-                  onChangeText={setLocationLng}
-                  keyboardType="decimal-pad"
-                />
-              </View>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Tọa độ</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="10.762622, 106.660172"
+                placeholderTextColor={colors.textSecondary}
+                value={locationCoordinates}
+                onChangeText={setLocationCoordinates}
+              />
             </View>
-            {locationLat && locationLng && (
+            
+            {locationCoordinates.trim() && (
               <TouchableOpacity
                 style={styles.mapButton}
-                onPress={() => Linking.openURL(`https://www.google.com/maps?q=${locationLat},${locationLng}`)}
+                onPress={openMapLocation}
               >
                 <IconSymbol name="map" size={20} color={colors.secondary} />
                 <Text style={styles.mapButtonText}>Xem trên bản đồ</Text>
@@ -667,7 +676,7 @@ export default function EditCustomerScreen() {
             )}
           </View>
 
-          {/* Insurance - Similar to add screen */}
+          {/* Insurance */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Thông tin bảo hiểm</Text>
             
@@ -737,7 +746,7 @@ export default function EditCustomerScreen() {
                     </View>
 
                     <View style={styles.inputContainer}>
-                      <Text style={styles.label}>Số hợp đồng *</Text>
+                      <Text style={styles.label}>Số hợp đồng * (không được trùng)</Text>
                       <TextInput
                         style={styles.input}
                         placeholder="Nhập số hợp đồng"
@@ -889,7 +898,7 @@ export default function EditCustomerScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Modals - Same as add screen */}
+      {/* Province Modal */}
       {showProvinceModal && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -919,6 +928,7 @@ export default function EditCustomerScreen() {
         </View>
       )}
 
+      {/* District Modal */}
       {showDistrictModal && selectedProvince && districts[selectedProvince] && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -947,6 +957,7 @@ export default function EditCustomerScreen() {
         </View>
       )}
 
+      {/* Commune Modal */}
       {showCommuneModal && selectedDistrict && communes[selectedDistrict] && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -974,6 +985,7 @@ export default function EditCustomerScreen() {
         </View>
       )}
 
+      {/* Company Modal */}
       {showCompanyModal && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -1001,6 +1013,7 @@ export default function EditCustomerScreen() {
         </View>
       )}
 
+      {/* Frequency Modal */}
       {showFrequencyModal && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -1031,7 +1044,6 @@ export default function EditCustomerScreen() {
   );
 }
 
-// Styles are the same as add.tsx
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -1084,6 +1096,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.text,
     marginBottom: 16,
+  },
+  helperText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginBottom: 12,
+    fontStyle: 'italic',
   },
   avatarContainer: {
     alignSelf: 'center',
