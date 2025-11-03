@@ -82,6 +82,8 @@ export default function EditCustomerScreen() {
   // Classification
   const [classification, setClassification] = useState<CustomerClassification>('Potential');
 
+  const isWeb = Platform.OS === 'web';
+
   useEffect(() => {
     if (customer) {
       setAvatar(customer.avatar || '');
@@ -98,8 +100,10 @@ export default function EditCustomerScreen() {
       setMeetingRecords(customer.meetingRecords);
       setFiles(customer.files);
       
-      // Convert location object to coordinate string
-      if (customer.location) {
+      // Convert location to coordinate string
+      if (typeof customer.location === 'string') {
+        setLocationCoordinates(customer.location);
+      } else if (customer.location && typeof customer.location === 'object' && 'latitude' in customer.location) {
         setLocationCoordinates(`${customer.location.latitude}, ${customer.location.longitude}`);
       }
 
@@ -290,19 +294,6 @@ export default function EditCustomerScreen() {
     const districtName = districts[selectedProvince]?.find(d => d.code === selectedDistrict)?.name || '';
     const communeName = communes[selectedDistrict]?.find(c => c.code === selectedCommune)?.name || '';
 
-    // Parse location coordinates
-    let location = undefined;
-    if (locationCoordinates.trim()) {
-      const coords = locationCoordinates.trim().split(',').map(c => c.trim());
-      if (coords.length === 2) {
-        const lat = parseFloat(coords[0]);
-        const lng = parseFloat(coords[1]);
-        if (!isNaN(lat) && !isNaN(lng)) {
-          location = { latitude: lat, longitude: lng };
-        }
-      }
-    }
-
     const updates: Partial<Customer> = {
       avatar,
       fullName: fullName.trim(),
@@ -319,7 +310,7 @@ export default function EditCustomerScreen() {
         province: provinceName,
         city: provinceName,
       },
-      location,
+      location: locationCoordinates.trim(),
       meetingRecords,
       files,
       hasInsurance,
@@ -345,6 +336,186 @@ export default function EditCustomerScreen() {
     if (locationCoordinates.trim()) {
       Linking.openURL(`https://www.google.com/maps?q=${locationCoordinates.trim()}`);
     }
+  };
+
+  const formatDateForInput = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const parseDateFromInput = (dateString: string): Date => {
+    const date = new Date(dateString);
+    return isNaN(date.getTime()) ? new Date() : date;
+  };
+
+  const renderDatePicker = (
+    label: string,
+    value: Date,
+    onChange: (date: Date) => void,
+    showPicker: boolean,
+    setShowPicker: (show: boolean) => void
+  ) => {
+    if (isWeb) {
+      return (
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>{label}</Text>
+          <input
+            type="date"
+            value={formatDateForInput(value)}
+            onChange={(e) => onChange(parseDateFromInput(e.target.value))}
+            style={{
+              backgroundColor: colors.secondary,
+              borderWidth: 1,
+              borderColor: colors.border,
+              borderRadius: 12,
+              paddingVertical: 14,
+              paddingHorizontal: 16,
+              fontSize: 16,
+              color: colors.text,
+              width: '100%',
+              fontFamily: 'inherit',
+            }}
+          />
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>{label}</Text>
+        <TouchableOpacity
+          style={styles.input}
+          onPress={() => setShowPicker(true)}
+        >
+          <Text style={styles.inputText}>
+            {value.toLocaleDateString('vi-VN')}
+          </Text>
+        </TouchableOpacity>
+        {showPicker && (
+          <DateTimePicker
+            value={value}
+            mode="date"
+            display="default"
+            onChange={(event, date) => {
+              setShowPicker(false);
+              if (date) onChange(date);
+            }}
+          />
+        )}
+      </View>
+    );
+  };
+
+  const renderDropdown = (
+    label: string,
+    value: string,
+    options: Array<{ code: string; name: string }>,
+    onChange: (code: string) => void,
+    placeholder: string,
+    showModal: boolean,
+    setShowModal: (show: boolean) => void
+  ) => {
+    if (isWeb) {
+      return (
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>{label}</Text>
+          <select
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            style={{
+              backgroundColor: colors.secondary,
+              borderWidth: 1,
+              borderColor: colors.border,
+              borderRadius: 12,
+              paddingVertical: 14,
+              paddingHorizontal: 16,
+              fontSize: 16,
+              color: colors.text,
+              width: '100%',
+              fontFamily: 'inherit',
+            }}
+          >
+            <option value="">{placeholder}</option>
+            {options.map((option) => (
+              <option key={option.code} value={option.code}>
+                {option.name}
+              </option>
+            ))}
+          </select>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>{label}</Text>
+        <TouchableOpacity
+          style={styles.input}
+          onPress={() => setShowModal(true)}
+        >
+          <Text style={styles.inputText}>
+            {value ? options.find(o => o.code === value)?.name : placeholder}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const renderSimpleDropdown = (
+    label: string,
+    value: string,
+    options: string[],
+    onChange: (value: string) => void,
+    placeholder: string,
+    showModal: boolean,
+    setShowModal: (show: boolean) => void
+  ) => {
+    if (isWeb) {
+      return (
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>{label}</Text>
+          <select
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            style={{
+              backgroundColor: colors.secondary,
+              borderWidth: 1,
+              borderColor: colors.border,
+              borderRadius: 12,
+              paddingVertical: 14,
+              paddingHorizontal: 16,
+              fontSize: 16,
+              color: colors.text,
+              width: '100%',
+              fontFamily: 'inherit',
+            }}
+          >
+            <option value="">{placeholder}</option>
+            {options.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>{label}</Text>
+        <TouchableOpacity
+          style={styles.input}
+          onPress={() => setShowModal(true)}
+        >
+          <Text style={styles.inputText}>
+            {value || placeholder}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
   };
 
   return (
@@ -426,28 +597,7 @@ export default function EditCustomerScreen() {
               </View>
             </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Ngày sinh</Text>
-              <TouchableOpacity
-                style={styles.input}
-                onPress={() => setShowDatePicker(true)}
-              >
-                <Text style={styles.inputText}>
-                  {dateOfBirth.toLocaleDateString('vi-VN')}
-                </Text>
-              </TouchableOpacity>
-              {showDatePicker && (
-                <DateTimePicker
-                  value={dateOfBirth}
-                  mode="date"
-                  display="default"
-                  onChange={(event, date) => {
-                    setShowDatePicker(false);
-                    if (date) setDateOfBirth(date);
-                  }}
-                />
-              )}
-            </View>
+            {renderDatePicker('Ngày sinh', dateOfBirth, setDateOfBirth, showDatePicker, setShowDatePicker)}
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Nghề nghiệp</Text>
@@ -491,44 +641,41 @@ export default function EditCustomerScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Địa chỉ chi tiết</Text>
             
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Tỉnh/Thành phố</Text>
-              <TouchableOpacity
-                style={styles.input}
-                onPress={() => setShowProvinceModal(true)}
-              >
-                <Text style={styles.inputText}>
-                  {selectedProvince ? provinces.find(p => p.code === selectedProvince)?.name : 'Chọn tỉnh/thành phố'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {selectedProvince && districts[selectedProvince] && (
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Quận/Huyện</Text>
-                <TouchableOpacity
-                  style={styles.input}
-                  onPress={() => setShowDistrictModal(true)}
-                >
-                  <Text style={styles.inputText}>
-                    {selectedDistrict ? districts[selectedProvince].find(d => d.code === selectedDistrict)?.name : 'Chọn quận/huyện'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+            {renderDropdown(
+              'Tỉnh/Thành phố',
+              selectedProvince,
+              provinces,
+              (code) => {
+                setSelectedProvince(code);
+                setSelectedDistrict('');
+                setSelectedCommune('');
+              },
+              'Chọn tỉnh/thành phố',
+              showProvinceModal,
+              setShowProvinceModal
             )}
 
-            {selectedDistrict && communes[selectedDistrict] && (
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Xã/Phường</Text>
-                <TouchableOpacity
-                  style={styles.input}
-                  onPress={() => setShowCommuneModal(true)}
-                >
-                  <Text style={styles.inputText}>
-                    {selectedCommune ? communes[selectedDistrict].find(c => c.code === selectedCommune)?.name : 'Chọn xã/phường'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+            {selectedProvince && districts[selectedProvince] && renderDropdown(
+              'Quận/Huyện',
+              selectedDistrict,
+              districts[selectedProvince],
+              (code) => {
+                setSelectedDistrict(code);
+                setSelectedCommune('');
+              },
+              'Chọn quận/huyện',
+              showDistrictModal,
+              setShowDistrictModal
+            )}
+
+            {selectedDistrict && communes[selectedDistrict] && renderDropdown(
+              'Xã/Phường',
+              selectedCommune,
+              communes[selectedDistrict],
+              setSelectedCommune,
+              'Chọn xã/phường',
+              showCommuneModal,
+              setShowCommuneModal
             )}
 
             <View style={styles.inputContainer}>
@@ -596,28 +743,7 @@ export default function EditCustomerScreen() {
               </TouchableOpacity>
             ) : (
               <View style={styles.meetingForm}>
-                <View style={styles.inputContainer}>
-                  <Text style={styles.label}>Ngày gặp</Text>
-                  <TouchableOpacity
-                    style={styles.input}
-                    onPress={() => setShowNewMeetingDatePicker(true)}
-                  >
-                    <Text style={styles.inputText}>
-                      {newMeetingDate.toLocaleDateString('vi-VN')}
-                    </Text>
-                  </TouchableOpacity>
-                  {showNewMeetingDatePicker && (
-                    <DateTimePicker
-                      value={newMeetingDate}
-                      mode="date"
-                      display="default"
-                      onChange={(event, date) => {
-                        setShowNewMeetingDatePicker(false);
-                        if (date) setNewMeetingDate(date);
-                      }}
-                    />
-                  )}
-                </View>
+                {renderDatePicker('Ngày gặp', newMeetingDate, setNewMeetingDate, showNewMeetingDatePicker, setShowNewMeetingDatePicker)}
 
                 <View style={styles.inputContainer}>
                   <Text style={styles.label}>Nội dung</Text>
@@ -733,17 +859,15 @@ export default function EditCustomerScreen() {
                   <View style={styles.insuranceForm}>
                     <Text style={styles.formTitle}>Thêm hợp đồng bảo hiểm</Text>
                     
-                    <View style={styles.inputContainer}>
-                      <Text style={styles.label}>Công ty bảo hiểm *</Text>
-                      <TouchableOpacity
-                        style={styles.input}
-                        onPress={() => setShowCompanyModal(true)}
-                      >
-                        <Text style={styles.inputText}>
-                          {currentCompany || 'Chọn công ty'}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
+                    {renderSimpleDropdown(
+                      'Công ty bảo hiểm *',
+                      currentCompany,
+                      insuranceCompanies,
+                      setCurrentCompany,
+                      'Chọn công ty',
+                      showCompanyModal,
+                      setShowCompanyModal
+                    )}
 
                     <View style={styles.inputContainer}>
                       <Text style={styles.label}>Số hợp đồng * (không được trùng)</Text>
@@ -769,28 +893,7 @@ export default function EditCustomerScreen() {
                       />
                     </View>
 
-                    <View style={styles.inputContainer}>
-                      <Text style={styles.label}>Ngày tham gia</Text>
-                      <TouchableOpacity
-                        style={styles.input}
-                        onPress={() => setShowJoinDatePicker(true)}
-                      >
-                        <Text style={styles.inputText}>
-                          {currentJoinDate.toLocaleDateString('vi-VN')}
-                        </Text>
-                      </TouchableOpacity>
-                      {showJoinDatePicker && (
-                        <DateTimePicker
-                          value={currentJoinDate}
-                          mode="date"
-                          display="default"
-                          onChange={(event, date) => {
-                            setShowJoinDatePicker(false);
-                            if (date) setCurrentJoinDate(date);
-                          }}
-                        />
-                      )}
-                    </View>
+                    {renderDatePicker('Ngày tham gia', currentJoinDate, setCurrentJoinDate, showJoinDatePicker, setShowJoinDatePicker)}
 
                     <View style={styles.inputContainer}>
                       <Text style={styles.label}>Số phí (VNĐ)</Text>
@@ -804,17 +907,44 @@ export default function EditCustomerScreen() {
                       />
                     </View>
 
-                    <View style={styles.inputContainer}>
-                      <Text style={styles.label}>Định kỳ phí</Text>
-                      <TouchableOpacity
-                        style={styles.input}
-                        onPress={() => setShowFrequencyModal(true)}
-                      >
-                        <Text style={styles.inputText}>
-                          {getFrequencyLabel(currentPaymentFrequency)}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
+                    {isWeb ? (
+                      <View style={styles.inputContainer}>
+                        <Text style={styles.label}>Định kỳ phí</Text>
+                        <select
+                          value={currentPaymentFrequency}
+                          onChange={(e) => setCurrentPaymentFrequency(e.target.value as PaymentFrequency)}
+                          style={{
+                            backgroundColor: colors.secondary,
+                            borderWidth: 1,
+                            borderColor: colors.border,
+                            borderRadius: 12,
+                            paddingVertical: 14,
+                            paddingHorizontal: 16,
+                            fontSize: 16,
+                            color: colors.text,
+                            width: '100%',
+                            fontFamily: 'inherit',
+                          }}
+                        >
+                          <option value="month">Tháng</option>
+                          <option value="quarter">Quý</option>
+                          <option value="6-month">Nửa năm</option>
+                          <option value="year">Năm</option>
+                        </select>
+                      </View>
+                    ) : (
+                      <View style={styles.inputContainer}>
+                        <Text style={styles.label}>Định kỳ phí</Text>
+                        <TouchableOpacity
+                          style={styles.input}
+                          onPress={() => setShowFrequencyModal(true)}
+                        >
+                          <Text style={styles.inputText}>
+                            {getFrequencyLabel(currentPaymentFrequency)}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
 
                     <View style={styles.formButtons}>
                       <TouchableOpacity
@@ -898,8 +1028,8 @@ export default function EditCustomerScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Province Modal */}
-      {showProvinceModal && (
+      {/* Native Modals (only for non-web platforms) */}
+      {!isWeb && showProvinceModal && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -928,8 +1058,7 @@ export default function EditCustomerScreen() {
         </View>
       )}
 
-      {/* District Modal */}
-      {showDistrictModal && selectedProvince && districts[selectedProvince] && (
+      {!isWeb && showDistrictModal && selectedProvince && districts[selectedProvince] && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -957,8 +1086,7 @@ export default function EditCustomerScreen() {
         </View>
       )}
 
-      {/* Commune Modal */}
-      {showCommuneModal && selectedDistrict && communes[selectedDistrict] && (
+      {!isWeb && showCommuneModal && selectedDistrict && communes[selectedDistrict] && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -985,8 +1113,7 @@ export default function EditCustomerScreen() {
         </View>
       )}
 
-      {/* Company Modal */}
-      {showCompanyModal && (
+      {!isWeb && showCompanyModal && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -1013,8 +1140,7 @@ export default function EditCustomerScreen() {
         </View>
       )}
 
-      {/* Frequency Modal */}
-      {showFrequencyModal && (
+      {!isWeb && showFrequencyModal && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>

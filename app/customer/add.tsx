@@ -77,6 +77,8 @@ export default function AddCustomerScreen() {
   // Classification
   const [classification, setClassification] = useState<CustomerClassification>('Potential');
 
+  const isWeb = Platform.OS === 'web';
+
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
@@ -252,6 +254,186 @@ export default function AddCustomerScreen() {
     }
   };
 
+  const formatDateForInput = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const parseDateFromInput = (dateString: string): Date => {
+    const date = new Date(dateString);
+    return isNaN(date.getTime()) ? new Date() : date;
+  };
+
+  const renderDatePicker = (
+    label: string,
+    value: Date,
+    onChange: (date: Date) => void,
+    showPicker: boolean,
+    setShowPicker: (show: boolean) => void
+  ) => {
+    if (isWeb) {
+      return (
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>{label}</Text>
+          <input
+            type="date"
+            value={formatDateForInput(value)}
+            onChange={(e) => onChange(parseDateFromInput(e.target.value))}
+            style={{
+              backgroundColor: colors.secondary,
+              borderWidth: 1,
+              borderColor: colors.border,
+              borderRadius: 12,
+              paddingVertical: 14,
+              paddingHorizontal: 16,
+              fontSize: 16,
+              color: colors.text,
+              width: '100%',
+              fontFamily: 'inherit',
+            }}
+          />
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>{label}</Text>
+        <TouchableOpacity
+          style={styles.input}
+          onPress={() => setShowPicker(true)}
+        >
+          <Text style={styles.inputText}>
+            {value.toLocaleDateString('vi-VN')}
+          </Text>
+        </TouchableOpacity>
+        {showPicker && (
+          <DateTimePicker
+            value={value}
+            mode="date"
+            display="default"
+            onChange={(event, date) => {
+              setShowPicker(false);
+              if (date) onChange(date);
+            }}
+          />
+        )}
+      </View>
+    );
+  };
+
+  const renderDropdown = (
+    label: string,
+    value: string,
+    options: Array<{ code: string; name: string }>,
+    onChange: (code: string) => void,
+    placeholder: string,
+    showModal: boolean,
+    setShowModal: (show: boolean) => void
+  ) => {
+    if (isWeb) {
+      return (
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>{label}</Text>
+          <select
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            style={{
+              backgroundColor: colors.secondary,
+              borderWidth: 1,
+              borderColor: colors.border,
+              borderRadius: 12,
+              paddingVertical: 14,
+              paddingHorizontal: 16,
+              fontSize: 16,
+              color: colors.text,
+              width: '100%',
+              fontFamily: 'inherit',
+            }}
+          >
+            <option value="">{placeholder}</option>
+            {options.map((option) => (
+              <option key={option.code} value={option.code}>
+                {option.name}
+              </option>
+            ))}
+          </select>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>{label}</Text>
+        <TouchableOpacity
+          style={styles.input}
+          onPress={() => setShowModal(true)}
+        >
+          <Text style={styles.inputText}>
+            {value ? options.find(o => o.code === value)?.name : placeholder}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const renderSimpleDropdown = (
+    label: string,
+    value: string,
+    options: string[],
+    onChange: (value: string) => void,
+    placeholder: string,
+    showModal: boolean,
+    setShowModal: (show: boolean) => void
+  ) => {
+    if (isWeb) {
+      return (
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>{label}</Text>
+          <select
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            style={{
+              backgroundColor: colors.secondary,
+              borderWidth: 1,
+              borderColor: colors.border,
+              borderRadius: 12,
+              paddingVertical: 14,
+              paddingHorizontal: 16,
+              fontSize: 16,
+              color: colors.text,
+              width: '100%',
+              fontFamily: 'inherit',
+            }}
+          >
+            <option value="">{placeholder}</option>
+            {options.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>{label}</Text>
+        <TouchableOpacity
+          style={styles.input}
+          onPress={() => setShowModal(true)}
+        >
+          <Text style={styles.inputText}>
+            {value || placeholder}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
@@ -331,28 +513,7 @@ export default function AddCustomerScreen() {
               </View>
             </View>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Ngày sinh</Text>
-              <TouchableOpacity
-                style={styles.input}
-                onPress={() => setShowDatePicker(true)}
-              >
-                <Text style={styles.inputText}>
-                  {dateOfBirth.toLocaleDateString('vi-VN')}
-                </Text>
-              </TouchableOpacity>
-              {showDatePicker && (
-                <DateTimePicker
-                  value={dateOfBirth}
-                  mode="date"
-                  display="default"
-                  onChange={(event, date) => {
-                    setShowDatePicker(false);
-                    if (date) setDateOfBirth(date);
-                  }}
-                />
-              )}
-            </View>
+            {renderDatePicker('Ngày sinh', dateOfBirth, setDateOfBirth, showDatePicker, setShowDatePicker)}
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Nghề nghiệp</Text>
@@ -396,44 +557,41 @@ export default function AddCustomerScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Địa chỉ chi tiết</Text>
             
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Tỉnh/Thành phố</Text>
-              <TouchableOpacity
-                style={styles.input}
-                onPress={() => setShowProvinceModal(true)}
-              >
-                <Text style={styles.inputText}>
-                  {selectedProvince ? provinces.find(p => p.code === selectedProvince)?.name : 'Chọn tỉnh/thành phố'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {selectedProvince && districts[selectedProvince] && (
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Quận/Huyện</Text>
-                <TouchableOpacity
-                  style={styles.input}
-                  onPress={() => setShowDistrictModal(true)}
-                >
-                  <Text style={styles.inputText}>
-                    {selectedDistrict ? districts[selectedProvince].find(d => d.code === selectedDistrict)?.name : 'Chọn quận/huyện'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+            {renderDropdown(
+              'Tỉnh/Thành phố',
+              selectedProvince,
+              provinces,
+              (code) => {
+                setSelectedProvince(code);
+                setSelectedDistrict('');
+                setSelectedCommune('');
+              },
+              'Chọn tỉnh/thành phố',
+              showProvinceModal,
+              setShowProvinceModal
             )}
 
-            {selectedDistrict && communes[selectedDistrict] && (
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Xã/Phường</Text>
-                <TouchableOpacity
-                  style={styles.input}
-                  onPress={() => setShowCommuneModal(true)}
-                >
-                  <Text style={styles.inputText}>
-                    {selectedCommune ? communes[selectedDistrict].find(c => c.code === selectedCommune)?.name : 'Chọn xã/phường'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+            {selectedProvince && districts[selectedProvince] && renderDropdown(
+              'Quận/Huyện',
+              selectedDistrict,
+              districts[selectedProvince],
+              (code) => {
+                setSelectedDistrict(code);
+                setSelectedCommune('');
+              },
+              'Chọn quận/huyện',
+              showDistrictModal,
+              setShowDistrictModal
+            )}
+
+            {selectedDistrict && communes[selectedDistrict] && renderDropdown(
+              'Xã/Phường',
+              selectedCommune,
+              communes[selectedDistrict],
+              setSelectedCommune,
+              'Chọn xã/phường',
+              showCommuneModal,
+              setShowCommuneModal
             )}
 
             <View style={styles.inputContainer}>
@@ -481,28 +639,7 @@ export default function AddCustomerScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Thông tin cuộc gặp</Text>
             
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Ngày gặp</Text>
-              <TouchableOpacity
-                style={styles.input}
-                onPress={() => setShowMeetingDatePicker(true)}
-              >
-                <Text style={styles.inputText}>
-                  {meetingDate.toLocaleDateString('vi-VN')}
-                </Text>
-              </TouchableOpacity>
-              {showMeetingDatePicker && (
-                <DateTimePicker
-                  value={meetingDate}
-                  mode="date"
-                  display="default"
-                  onChange={(event, date) => {
-                    setShowMeetingDatePicker(false);
-                    if (date) setMeetingDate(date);
-                  }}
-                />
-              )}
-            </View>
+            {renderDatePicker('Ngày gặp', meetingDate, setMeetingDate, showMeetingDatePicker, setShowMeetingDatePicker)}
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Nội dung lần gặp</Text>
@@ -601,17 +738,15 @@ export default function AddCustomerScreen() {
                   <View style={styles.insuranceForm}>
                     <Text style={styles.formTitle}>Thêm hợp đồng bảo hiểm</Text>
                     
-                    <View style={styles.inputContainer}>
-                      <Text style={styles.label}>Công ty bảo hiểm *</Text>
-                      <TouchableOpacity
-                        style={styles.input}
-                        onPress={() => setShowCompanyModal(true)}
-                      >
-                        <Text style={styles.inputText}>
-                          {currentCompany || 'Chọn công ty'}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
+                    {renderSimpleDropdown(
+                      'Công ty bảo hiểm *',
+                      currentCompany,
+                      insuranceCompanies,
+                      setCurrentCompany,
+                      'Chọn công ty',
+                      showCompanyModal,
+                      setShowCompanyModal
+                    )}
 
                     <View style={styles.inputContainer}>
                       <Text style={styles.label}>Số hợp đồng * (không được trùng)</Text>
@@ -637,28 +772,7 @@ export default function AddCustomerScreen() {
                       />
                     </View>
 
-                    <View style={styles.inputContainer}>
-                      <Text style={styles.label}>Ngày tham gia</Text>
-                      <TouchableOpacity
-                        style={styles.input}
-                        onPress={() => setShowJoinDatePicker(true)}
-                      >
-                        <Text style={styles.inputText}>
-                          {currentJoinDate.toLocaleDateString('vi-VN')}
-                        </Text>
-                      </TouchableOpacity>
-                      {showJoinDatePicker && (
-                        <DateTimePicker
-                          value={currentJoinDate}
-                          mode="date"
-                          display="default"
-                          onChange={(event, date) => {
-                            setShowJoinDatePicker(false);
-                            if (date) setCurrentJoinDate(date);
-                          }}
-                        />
-                      )}
-                    </View>
+                    {renderDatePicker('Ngày tham gia', currentJoinDate, setCurrentJoinDate, showJoinDatePicker, setShowJoinDatePicker)}
 
                     <View style={styles.inputContainer}>
                       <Text style={styles.label}>Số phí (VNĐ)</Text>
@@ -672,17 +786,44 @@ export default function AddCustomerScreen() {
                       />
                     </View>
 
-                    <View style={styles.inputContainer}>
-                      <Text style={styles.label}>Định kỳ phí</Text>
-                      <TouchableOpacity
-                        style={styles.input}
-                        onPress={() => setShowFrequencyModal(true)}
-                      >
-                        <Text style={styles.inputText}>
-                          {getFrequencyLabel(currentPaymentFrequency)}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
+                    {isWeb ? (
+                      <View style={styles.inputContainer}>
+                        <Text style={styles.label}>Định kỳ phí</Text>
+                        <select
+                          value={currentPaymentFrequency}
+                          onChange={(e) => setCurrentPaymentFrequency(e.target.value as PaymentFrequency)}
+                          style={{
+                            backgroundColor: colors.secondary,
+                            borderWidth: 1,
+                            borderColor: colors.border,
+                            borderRadius: 12,
+                            paddingVertical: 14,
+                            paddingHorizontal: 16,
+                            fontSize: 16,
+                            color: colors.text,
+                            width: '100%',
+                            fontFamily: 'inherit',
+                          }}
+                        >
+                          <option value="month">Tháng</option>
+                          <option value="quarter">Quý</option>
+                          <option value="6-month">Nửa năm</option>
+                          <option value="year">Năm</option>
+                        </select>
+                      </View>
+                    ) : (
+                      <View style={styles.inputContainer}>
+                        <Text style={styles.label}>Định kỳ phí</Text>
+                        <TouchableOpacity
+                          style={styles.input}
+                          onPress={() => setShowFrequencyModal(true)}
+                        >
+                          <Text style={styles.inputText}>
+                            {getFrequencyLabel(currentPaymentFrequency)}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
 
                     <View style={styles.formButtons}>
                       <TouchableOpacity
@@ -766,8 +907,8 @@ export default function AddCustomerScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Province Modal */}
-      {showProvinceModal && (
+      {/* Native Modals (only for non-web platforms) */}
+      {!isWeb && showProvinceModal && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -796,8 +937,7 @@ export default function AddCustomerScreen() {
         </View>
       )}
 
-      {/* District Modal */}
-      {showDistrictModal && selectedProvince && districts[selectedProvince] && (
+      {!isWeb && showDistrictModal && selectedProvince && districts[selectedProvince] && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -825,8 +965,7 @@ export default function AddCustomerScreen() {
         </View>
       )}
 
-      {/* Commune Modal */}
-      {showCommuneModal && selectedDistrict && communes[selectedDistrict] && (
+      {!isWeb && showCommuneModal && selectedDistrict && communes[selectedDistrict] && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -853,8 +992,7 @@ export default function AddCustomerScreen() {
         </View>
       )}
 
-      {/* Company Modal */}
-      {showCompanyModal && (
+      {!isWeb && showCompanyModal && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
@@ -881,8 +1019,7 @@ export default function AddCustomerScreen() {
         </View>
       )}
 
-      {/* Frequency Modal */}
-      {showFrequencyModal && (
+      {!isWeb && showFrequencyModal && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
