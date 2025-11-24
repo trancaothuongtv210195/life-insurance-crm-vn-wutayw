@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -32,6 +32,7 @@ export default function AddCustomerScreen() {
   const [avatar, setAvatar] = useState<string>('');
   const [fullName, setFullName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [phoneError, setPhoneError] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   
@@ -67,6 +68,7 @@ export default function AddCustomerScreen() {
   const [currentCompany, setCurrentCompany] = useState('');
   const [showCompanyModal, setShowCompanyModal] = useState(false);
   const [currentContractNumber, setCurrentContractNumber] = useState('');
+  const [contractError, setContractError] = useState('');
   const [currentPolicyDetails, setCurrentPolicyDetails] = useState('');
   const [currentJoinDate, setCurrentJoinDate] = useState(new Date());
   const [showJoinDatePicker, setShowJoinDatePicker] = useState(false);
@@ -77,7 +79,38 @@ export default function AddCustomerScreen() {
   // Classification
   const [classification, setClassification] = useState<CustomerClassification>('Potential');
 
+  // Saving state to prevent double-saves
+  const [isSaving, setIsSaving] = useState(false);
+
   const isWeb = Platform.OS === 'web';
+
+  // Real-time phone number validation
+  useEffect(() => {
+    if (phoneNumber.trim()) {
+      if (checkPhoneNumberExists(phoneNumber.trim())) {
+        setPhoneError('Số điện thoại này đã tồn tại trong hệ thống');
+      } else {
+        setPhoneError('');
+      }
+    } else {
+      setPhoneError('');
+    }
+  }, [phoneNumber]);
+
+  // Real-time contract number validation
+  useEffect(() => {
+    if (currentContractNumber.trim()) {
+      if (checkContractNumberExists(currentContractNumber.trim())) {
+        setContractError('Số hợp đồng này đã tồn tại trong hệ thống');
+      } else if (insuranceContracts.some(c => c.contractNumber === currentContractNumber.trim())) {
+        setContractError('Số hợp đồng này đã được thêm vào danh sách');
+      } else {
+        setContractError('');
+      }
+    } else {
+      setContractError('');
+    }
+  }, [currentContractNumber, insuranceContracts]);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -144,15 +177,9 @@ export default function AddCustomerScreen() {
       return;
     }
     
-    // Check duplicate contract number
-    if (checkContractNumberExists(currentContractNumber.trim())) {
-      Alert.alert('Cảnh báo', 'Số hợp đồng này đã tồn tại trong hệ thống. Vui lòng kiểm tra lại.');
-      return;
-    }
-    
-    // Check duplicate within current contracts
-    if (insuranceContracts.some(c => c.contractNumber === currentContractNumber.trim())) {
-      Alert.alert('Cảnh báo', 'Số hợp đồng này đã được thêm vào danh sách');
+    // Check for errors
+    if (contractError) {
+      Alert.alert('Cảnh báo', contractError);
       return;
     }
     
@@ -181,7 +208,13 @@ export default function AddCustomerScreen() {
     Alert.alert('Thành công', 'Đã thêm hợp đồng bảo hiểm');
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    // Prevent double-saves
+    if (isSaving) {
+      console.log('Already saving, ignoring duplicate save request');
+      return;
+    }
+
     if (!fullName.trim()) {
       Alert.alert('Lỗi', 'Vui lòng nhập họ tên');
       return;
@@ -192,51 +225,60 @@ export default function AddCustomerScreen() {
       return;
     }
 
-    // Check for duplicate phone number
-    if (checkPhoneNumberExists(phoneNumber.trim())) {
-      Alert.alert('Cảnh báo', 'Số điện thoại này đã tồn tại trong hệ thống. Vui lòng kiểm tra lại.');
+    // Check for phone error
+    if (phoneError) {
+      Alert.alert('Cảnh báo', phoneError);
       return;
     }
 
-    const provinceName = provinces.find(p => p.code === selectedProvince)?.name || '';
-    const districtName = districts[selectedProvince]?.find(d => d.code === selectedDistrict)?.name || '';
-    const communeName = communes[selectedDistrict]?.find(c => c.code === selectedCommune)?.name || '';
+    setIsSaving(true);
 
-    const meetingRecords: MeetingRecord[] = meetingNotes ? [{
-      id: '1',
-      date: meetingDate,
-      notes: meetingNotes,
-      createdAt: new Date(),
-    }] : [];
+    try {
+      const provinceName = provinces.find(p => p.code === selectedProvince)?.name || '';
+      const districtName = districts[selectedProvince]?.find(d => d.code === selectedDistrict)?.name || '';
+      const communeName = communes[selectedDistrict]?.find(c => c.code === selectedCommune)?.name || '';
 
-    const newCustomer = {
-      avatar,
-      fullName: fullName.trim(),
-      phoneNumber: phoneNumber.trim(),
-      dateOfBirth,
-      occupation: occupation.trim(),
-      financialStatus: financialStatus.trim(),
-      familyInfo: familyInfo.trim(),
-      classification,
-      address: {
-        hamlet: hamlet.trim(),
-        commune: communeName,
-        district: districtName,
-        province: provinceName,
-        city: provinceName,
-      },
-      location: locationCoordinates.trim(),
-      meetingRecords,
-      files,
-      hasInsurance,
-      insuranceContracts,
-      createdBy: user?.id || '1',
-    };
+      const meetingRecords: MeetingRecord[] = meetingNotes ? [{
+        id: '1',
+        date: meetingDate,
+        notes: meetingNotes,
+        createdAt: new Date(),
+      }] : [];
 
-    addCustomer(newCustomer);
-    Alert.alert('Thành công', 'Đã thêm khách hàng mới', [
-      { text: 'OK', onPress: () => router.back() },
-    ]);
+      const newCustomer = {
+        avatar,
+        fullName: fullName.trim(),
+        phoneNumber: phoneNumber.trim(),
+        dateOfBirth,
+        occupation: occupation.trim(),
+        financialStatus: financialStatus.trim(),
+        familyInfo: familyInfo.trim(),
+        classification,
+        address: {
+          hamlet: hamlet.trim(),
+          commune: communeName,
+          district: districtName,
+          province: provinceName,
+          city: provinceName,
+        },
+        location: locationCoordinates.trim(),
+        meetingRecords,
+        files,
+        hasInsurance,
+        insuranceContracts,
+        createdBy: user?.id || '1',
+      };
+
+      await addCustomer(newCustomer);
+      Alert.alert('Thành công', 'Đã thêm khách hàng mới', [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
+    } catch (error) {
+      console.log('Error saving customer:', error);
+      Alert.alert('Lỗi', 'Không thể lưu khách hàng');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const getFrequencyLabel = (freq: PaymentFrequency) => {
@@ -447,8 +489,11 @@ export default function AddCustomerScreen() {
         <TouchableOpacity
           style={styles.headerButton}
           onPress={handleSave}
+          disabled={isSaving}
         >
-          <Text style={styles.saveText}>Lưu</Text>
+          <Text style={[styles.saveText, isSaving && { opacity: 0.5 }]}>
+            {isSaving ? 'Đang lưu...' : 'Lưu'}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -495,7 +540,7 @@ export default function AddCustomerScreen() {
               <Text style={styles.label}>Số điện thoại * (không được trùng)</Text>
               <View style={styles.phoneContainer}>
                 <TextInput
-                  style={[styles.input, { flex: 1 }]}
+                  style={[styles.input, { flex: 1 }, phoneError && styles.inputError]}
                   placeholder="Nhập số điện thoại"
                   placeholderTextColor={colors.textSecondary}
                   value={phoneNumber}
@@ -511,6 +556,9 @@ export default function AddCustomerScreen() {
                   </TouchableOpacity>
                 )}
               </View>
+              {phoneError ? (
+                <Text style={styles.errorText}>{phoneError}</Text>
+              ) : null}
             </View>
 
             {renderDatePicker('Ngày sinh', dateOfBirth, setDateOfBirth, showDatePicker, setShowDatePicker)}
@@ -751,12 +799,15 @@ export default function AddCustomerScreen() {
                     <View style={styles.inputContainer}>
                       <Text style={styles.label}>Số hợp đồng * (không được trùng)</Text>
                       <TextInput
-                        style={styles.input}
+                        style={[styles.input, contractError && styles.inputError]}
                         placeholder="Nhập số hợp đồng"
                         placeholderTextColor={colors.textSecondary}
                         value={currentContractNumber}
                         onChangeText={setCurrentContractNumber}
                       />
+                      {contractError ? (
+                        <Text style={styles.errorText}>{contractError}</Text>
+                      ) : null}
                     </View>
 
                     <View style={styles.inputContainer}>
@@ -1139,6 +1190,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     fontSize: 16,
     color: colors.text,
+  },
+  inputError: {
+    borderColor: colors.error,
+    borderWidth: 2,
+  },
+  errorText: {
+    color: colors.error,
+    fontSize: 13,
+    marginTop: 4,
+    fontWeight: '500',
   },
   inputText: {
     fontSize: 16,

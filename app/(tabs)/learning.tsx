@@ -23,6 +23,7 @@ export default function LearningScreen() {
   const { user } = useAuth();
   const [selectedContent, setSelectedContent] = useState<LearningContent | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleContentPress = (content: LearningContent) => {
     setSelectedContent(content);
@@ -35,19 +36,28 @@ export default function LearningScreen() {
     });
   };
 
-  const handleDelete = (id: string, title: string) => {
+  const handleDelete = async (id: string, title: string) => {
+    if (isDeleting) {
+      console.log('Already deleting, ignoring duplicate delete request');
+      return;
+    }
+
     Alert.alert('Xóa bài học', `Bạn có chắc chắn muốn xóa "${title}"?`, [
       { text: 'Hủy', style: 'cancel' },
       {
         text: 'Xóa',
         style: 'destructive',
         onPress: async () => {
+          setIsDeleting(true);
           try {
             await deleteLearningContent(id);
-            Alert.alert('Thành công', 'Đã xóa bài học');
             setShowDetailModal(false);
+            Alert.alert('Thành công', 'Đã xóa bài học');
           } catch (error) {
+            console.log('Error deleting learning content:', error);
             Alert.alert('Lỗi', 'Không thể xóa bài học');
+          } finally {
+            setIsDeleting(false);
           }
         },
       },
@@ -225,11 +235,14 @@ export default function LearningScreen() {
             {user?.role === 'Admin' && selectedContent && (
               <View style={styles.modalFooter}>
                 <TouchableOpacity
-                  style={styles.deleteButton}
+                  style={[styles.deleteButton, isDeleting && { opacity: 0.5 }]}
                   onPress={() => handleDelete(selectedContent.id, selectedContent.title)}
+                  disabled={isDeleting}
                 >
                   <IconSymbol name="trash.fill" size={20} color={colors.error} />
-                  <Text style={styles.deleteButtonText}>Xóa bài học</Text>
+                  <Text style={styles.deleteButtonText}>
+                    {isDeleting ? 'Đang xóa...' : 'Xóa bài học'}
+                  </Text>
                 </TouchableOpacity>
               </View>
             )}

@@ -26,6 +26,7 @@ export default function AddLearningScreen() {
   const [content, setContent] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
   const [type, setType] = useState<'video' | 'pdf' | 'announcement'>('video');
+  const [isSaving, setIsSaving] = useState(false);
 
   if (user?.role !== 'Admin') {
     return (
@@ -42,6 +43,12 @@ export default function AddLearningScreen() {
   }
 
   const handleSave = async () => {
+    // Prevent double-saves
+    if (isSaving) {
+      console.log('Already saving, ignoring duplicate save request');
+      return;
+    }
+
     if (!title || !description) {
       Alert.alert('Lỗi', 'Vui lòng điền đầy đủ tiêu đề và mô tả');
       return;
@@ -51,6 +58,8 @@ export default function AddLearningScreen() {
       Alert.alert('Lỗi', 'Vui lòng nhập URL video');
       return;
     }
+
+    setIsSaving(true);
 
     try {
       await addLearningContent({
@@ -66,7 +75,9 @@ export default function AddLearningScreen() {
         { text: 'OK', onPress: () => router.back() },
       ]);
     } catch (error) {
+      console.log('Error saving learning content:', error);
       Alert.alert('Lỗi', 'Không thể thêm bài học');
+      setIsSaving(false);
     }
   };
 
@@ -191,12 +202,22 @@ export default function AddLearningScreen() {
       </KeyboardAvoidingView>
 
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.cancelButton} onPress={() => router.back()}>
+        <TouchableOpacity 
+          style={styles.cancelButton} 
+          onPress={() => router.back()}
+          disabled={isSaving}
+        >
           <Text style={styles.cancelButtonText}>Hủy</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+        <TouchableOpacity 
+          style={[styles.saveButton, isSaving && { opacity: 0.5 }]} 
+          onPress={handleSave}
+          disabled={isSaving}
+        >
           <IconSymbol name="checkmark.circle.fill" size={24} color={colors.secondary} />
-          <Text style={styles.saveButtonText}>Lưu bài học</Text>
+          <Text style={styles.saveButtonText}>
+            {isSaving ? 'Đang lưu...' : 'Lưu bài học'}
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

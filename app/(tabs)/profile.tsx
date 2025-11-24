@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
+import { useData } from '@/contexts/DataContext';
 import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { router } from 'expo-router';
@@ -20,7 +21,9 @@ import * as ImagePicker from 'expo-image-picker';
 
 export default function ProfileScreen() {
   const { user, logout, updateProfile, changePassword } = useAuth();
+  const { reminders } = useData();
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showNotificationsModal, setShowNotificationsModal] = useState(false);
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -86,6 +89,36 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleShowNotifications = () => {
+    setShowNotificationsModal(true);
+  };
+
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'birthday':
+        return 'gift.fill';
+      case 'payment-due':
+        return 'calendar.badge.clock';
+      case 'payment-overdue':
+        return 'exclamationmark.triangle.fill';
+      default:
+        return 'bell.fill';
+    }
+  };
+
+  const getNotificationColor = (type: string) => {
+    switch (type) {
+      case 'birthday':
+        return colors.accent;
+      case 'payment-due':
+        return colors.primary;
+      case 'payment-overdue':
+        return colors.error;
+      default:
+        return colors.primary;
+    }
+  };
+
   const menuItems = [
     {
       icon: 'person.circle.fill',
@@ -120,7 +153,8 @@ export default function ProfileScreen() {
     {
       icon: 'bell.fill',
       label: 'Thông báo',
-      onPress: () => console.log('Notifications'),
+      badge: reminders.length > 0 ? reminders.length : undefined,
+      onPress: handleShowNotifications,
       show: true,
     },
     {
@@ -177,6 +211,11 @@ export default function ProfileScreen() {
                 <IconSymbol name={item.icon} size={24} color={colors.primary} />
               </View>
               <Text style={styles.menuLabel}>{item.label}</Text>
+              {item.badge && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{item.badge}</Text>
+                </View>
+              )}
               <IconSymbol name="chevron.right" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
           ))}
@@ -190,6 +229,7 @@ export default function ProfileScreen() {
         <View style={{ height: 100 }} />
       </ScrollView>
 
+      {/* Password Change Modal */}
       <Modal
         visible={showPasswordModal}
         transparent
@@ -257,6 +297,49 @@ export default function ProfileScreen() {
                 <Text style={styles.modalButtonSaveText}>Lưu</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Notifications Modal */}
+      <Modal
+        visible={showNotificationsModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowNotificationsModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Thông báo</Text>
+              <TouchableOpacity onPress={() => setShowNotificationsModal(false)}>
+                <IconSymbol name="xmark.circle.fill" size={28} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.notificationsBody}>
+              {reminders.length === 0 ? (
+                <View style={styles.emptyNotifications}>
+                  <IconSymbol name="bell.slash.fill" size={48} color={colors.textSecondary} />
+                  <Text style={styles.emptyNotificationsText}>Không có thông báo mới</Text>
+                </View>
+              ) : (
+                reminders.map((reminder, index) => (
+                  <View key={index} style={styles.notificationItem}>
+                    <View style={[styles.notificationIcon, { backgroundColor: getNotificationColor(reminder.type) }]}>
+                      <IconSymbol name={getNotificationIcon(reminder.type)} size={20} color={colors.secondary} />
+                    </View>
+                    <View style={styles.notificationContent}>
+                      <Text style={styles.notificationCustomer}>{reminder.customerName}</Text>
+                      <Text style={styles.notificationMessage}>{reminder.message}</Text>
+                      <Text style={styles.notificationDate}>
+                        {reminder.date.toLocaleDateString('vi-VN')}
+                      </Text>
+                    </View>
+                  </View>
+                ))
+              )}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -365,6 +448,20 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: '500',
   },
+  badge: {
+    backgroundColor: colors.error,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginRight: 8,
+    minWidth: 24,
+    alignItems: 'center',
+  },
+  badgeText: {
+    color: colors.secondary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -395,6 +492,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     width: '100%',
     maxWidth: 400,
+    maxHeight: '80%',
     boxShadow: '0px 8px 24px rgba(0, 0, 0, 0.2)',
     elevation: 8,
   },
@@ -465,5 +563,50 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: colors.secondary,
+  },
+  notificationsBody: {
+    maxHeight: 500,
+  },
+  emptyNotifications: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  emptyNotificationsText: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    marginTop: 16,
+  },
+  notificationItem: {
+    flexDirection: 'row',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  notificationIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  notificationContent: {
+    flex: 1,
+  },
+  notificationCustomer: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 4,
+  },
+  notificationMessage: {
+    fontSize: 14,
+    color: colors.text,
+    marginBottom: 4,
+  },
+  notificationDate: {
+    fontSize: 12,
+    color: colors.textSecondary,
   },
 });
