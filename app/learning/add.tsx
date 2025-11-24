@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -27,6 +27,7 @@ export default function AddLearningScreen() {
   const [videoUrl, setVideoUrl] = useState('');
   const [type, setType] = useState<'video' | 'pdf' | 'announcement'>('video');
   const [isSaving, setIsSaving] = useState(false);
+  const saveInProgressRef = useRef(false);
 
   if (user?.role !== 'Admin') {
     return (
@@ -42,44 +43,57 @@ export default function AddLearningScreen() {
     );
   }
 
-  const handleSave = async () => {
-    // Prevent double-saves
-    if (isSaving) {
-      console.log('Already saving, ignoring duplicate save request');
+  const handleSave = useCallback(async () => {
+    // Double-check with ref to prevent race conditions
+    if (isSaving || saveInProgressRef.current) {
+      console.log('Save already in progress, ignoring duplicate call');
       return;
     }
 
-    if (!title || !description) {
+    if (!title.trim() || !description.trim()) {
       Alert.alert('Lỗi', 'Vui lòng điền đầy đủ tiêu đề và mô tả');
       return;
     }
 
-    if (type === 'video' && !videoUrl) {
+    if (type === 'video' && !videoUrl.trim()) {
       Alert.alert('Lỗi', 'Vui lòng nhập URL video');
       return;
     }
 
+    // Set both state and ref
     setIsSaving(true);
+    saveInProgressRef.current = true;
+    console.log('Starting save learning content operation...');
 
     try {
       await addLearningContent({
-        title,
-        description,
-        content,
+        title: title.trim(),
+        description: description.trim(),
+        content: content.trim(),
         type,
-        videoUrl: type === 'video' ? videoUrl : undefined,
+        videoUrl: type === 'video' ? videoUrl.trim() : undefined,
         createdBy: user?.id || '',
       });
 
+      console.log('Learning content added successfully');
       Alert.alert('Thành công', 'Đã thêm bài học', [
-        { text: 'OK', onPress: () => router.back() },
+        { 
+          text: 'OK', 
+          onPress: () => {
+            console.log('Navigating back...');
+            router.back();
+          }
+        },
       ]);
-    } catch (error) {
-      console.log('Error saving learning content:', error);
-      Alert.alert('Lỗi', 'Không thể thêm bài học');
+    } catch (error: any) {
+      console.error('Error saving learning content:', error);
+      Alert.alert('Lỗi', error.message || 'Không thể thêm bài học. Vui lòng thử lại.');
+    } finally {
+      // Reset both state and ref
       setIsSaving(false);
+      saveInProgressRef.current = false;
     }
-  };
+  }, [title, description, content, type, videoUrl, user, addLearningContent]);
 
   const types: { value: 'video' | 'pdf' | 'announcement'; label: string; icon: string }[] = [
     { value: 'video', label: 'Video', icon: 'play.rectangle.fill' },
@@ -90,7 +104,11 @@ export default function AddLearningScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerButton}>
+        <TouchableOpacity 
+          onPress={() => router.back()} 
+          style={styles.headerButton}
+          disabled={isSaving}
+        >
           <IconSymbol name="chevron.left" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Thêm bài học</Text>
@@ -116,6 +134,7 @@ export default function AddLearningScreen() {
                       type === t.value && styles.typeButtonActive,
                     ]}
                     onPress={() => setType(t.value)}
+                    disabled={isSaving}
                   >
                     <IconSymbol
                       name={t.icon}
@@ -145,6 +164,7 @@ export default function AddLearningScreen() {
                 onChangeText={setTitle}
                 placeholder="Nhập tiêu đề bài học"
                 placeholderTextColor={colors.textSecondary}
+                editable={!isSaving}
               />
             </View>
 
@@ -160,6 +180,7 @@ export default function AddLearningScreen() {
                 placeholderTextColor={colors.textSecondary}
                 multiline
                 numberOfLines={3}
+                editable={!isSaving}
               />
             </View>
 
@@ -176,6 +197,7 @@ export default function AddLearningScreen() {
                   placeholderTextColor={colors.textSecondary}
                   autoCapitalize="none"
                   keyboardType="url"
+                  editable={!isSaving}
                 />
                 <Text style={styles.hint}>
                   Hỗ trợ: YouTube, Vimeo, hoặc link video trực tiếp
@@ -193,6 +215,7 @@ export default function AddLearningScreen() {
                 placeholderTextColor={colors.textSecondary}
                 multiline
                 numberOfLines={8}
+                editable={!isSaving}
               />
             </View>
           </View>

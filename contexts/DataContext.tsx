@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { Customer, Meeting, LearningContent, DashboardStats, CustomerReminder, User } from '@/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -39,12 +39,16 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Use refs to track ongoing operations
+  const operationQueue = useRef<Map<string, Promise<any>>>(new Map());
+
   useEffect(() => {
     loadData();
   }, []);
 
   const loadData = async () => {
     try {
+      console.log('Loading data from AsyncStorage...');
       const [customersData, learningData, usersData] = await Promise.all([
         AsyncStorage.getItem(CUSTOMERS_KEY),
         AsyncStorage.getItem(LEARNING_KEY),
@@ -69,6 +73,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             nextPaymentDate: new Date(ic.nextPaymentDate),
           })),
         })));
+        console.log('Loaded customers:', parsedCustomers.length);
       }
 
       if (learningData) {
@@ -77,6 +82,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           ...l,
           createdAt: new Date(l.createdAt),
         })));
+        console.log('Loaded learning content:', parsedLearning.length);
       }
 
       if (usersData) {
@@ -86,42 +92,78 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           createdAt: new Date(u.createdAt),
           updatedAt: u.updatedAt ? new Date(u.updatedAt) : undefined,
         })));
+        console.log('Loaded users:', parsedUsers.length);
       }
     } catch (error) {
-      console.log('Error loading data:', error);
+      console.error('Error loading data:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
   const refreshData = async () => {
+    console.log('Refreshing data...');
     await loadData();
+  };
+
+  const queueOperation = async <T,>(lockKey: string, operation: () => Promise<T>): Promise<T> => {
+    // If operation is already running, wait for it
+    if (operationQueue.current.has(lockKey)) {
+      console.log(`Operation ${lockKey} already in progress, waiting...`);
+      await operationQueue.current.get(lockKey);
+    }
+
+    // Start new operation
+    console.log(`Starting operation ${lockKey}`);
+    const promise = operation();
+    operationQueue.current.set(lockKey, promise);
+
+    try {
+      const result = await promise;
+      console.log(`Operation ${lockKey} completed successfully`);
+      return result;
+    } catch (error) {
+      console.error(`Operation ${lockKey} failed:`, error);
+      throw error;
+    } finally {
+      operationQueue.current.delete(lockKey);
+      console.log(`Operation ${lockKey} cleaned up`);
+    }
   };
 
   const saveCustomers = async (data: Customer[]) => {
     try {
+      console.log('Saving customers to AsyncStorage:', data.length);
       await AsyncStorage.setItem(CUSTOMERS_KEY, JSON.stringify(data));
       setCustomers(data);
+      console.log('Customers saved successfully');
     } catch (error) {
-      console.log('Error saving customers:', error);
+      console.error('Error saving customers:', error);
+      throw error;
     }
   };
 
   const saveLearningContent = async (data: LearningContent[]) => {
     try {
+      console.log('Saving learning content to AsyncStorage:', data.length);
       await AsyncStorage.setItem(LEARNING_KEY, JSON.stringify(data));
       setLearningContent(data);
+      console.log('Learning content saved successfully');
     } catch (error) {
-      console.log('Error saving learning content:', error);
+      console.error('Error saving learning content:', error);
+      throw error;
     }
   };
 
   const saveUsers = async (data: User[]) => {
     try {
+      console.log('Saving users to AsyncStorage:', data.length);
       await AsyncStorage.setItem(USERS_KEY, JSON.stringify(data));
       setUsers(data);
+      console.log('Users saved successfully');
     } catch (error) {
-      console.log('Error saving users:', error);
+      console.error('Error saving users:', error);
+      throw error;
     }
   };
 
@@ -220,73 +262,103 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addCustomer = async (customer: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>) => {
-    const newCustomer: Customer = {
-      ...customer,
-      id: Date.now().toString(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    await saveCustomers([...customers, newCustomer]);
+    return queueOperation('add-customer', async () => {
+      const newCustomer: Customer = {
+        ...customer,
+        id: `customer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      console.log('Adding new customer:', newCustomer.id);
+      await saveCustomers([...customers, newCustomer]);
+    });
   };
 
   const updateCustomer = async (id: string, updates: Partial<Customer>) => {
-    const updated = customers.map(c => 
-      c.id === id ? { ...c, ...updates, updatedAt: new Date() } : c
-    );
-    await saveCustomers(updated);
+    return queueOperation(`update-customer-${id}`, async () => {
+      console.log('Updating customer:', id);
+      const updated = customers.map(c => 
+        c.id === id ? { ...c, ...updates, updatedAt: new Date() } : c
+      );
+      await saveCustomers(updated);
+    });
   };
 
   const deleteCustomer = async (id: string) => {
-    await saveCustomers(customers.filter(c => c.id !== id));
+    return queueOperation(`delete-customer-${id}`, async () => {
+      console.log('Deleting customer:', id);
+      await saveCustomers(customers.filter(c => c.id !== id));
+    });
   };
 
   const addMeeting = async (meeting: Omit<Meeting, 'id' | 'createdAt'>) => {
-    const newMeeting: Meeting = {
-      ...meeting,
-      id: Date.now().toString(),
-      createdAt: new Date(),
-    };
-    setMeetings([...meetings, newMeeting]);
+    return queueOperation('add-meeting', async () => {
+      const newMeeting: Meeting = {
+        ...meeting,
+        id: `meeting_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        createdAt: new Date(),
+      };
+      console.log('Adding new meeting:', newMeeting.id);
+      setMeetings([...meetings, newMeeting]);
+    });
   };
 
   const addLearningContent = async (content: Omit<LearningContent, 'id' | 'createdAt'>) => {
-    const newContent: LearningContent = {
-      ...content,
-      id: Date.now().toString(),
-      createdAt: new Date(),
-    };
-    await saveLearningContent([...learningContent, newContent]);
+    return queueOperation('add-learning', async () => {
+      const newContent: LearningContent = {
+        ...content,
+        id: `learning_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        createdAt: new Date(),
+      };
+      console.log('Adding new learning content:', newContent.id);
+      await saveLearningContent([...learningContent, newContent]);
+    });
   };
 
   const updateLearningContent = async (id: string, updates: Partial<LearningContent>) => {
-    const updated = learningContent.map(l => 
-      l.id === id ? { ...l, ...updates } : l
-    );
-    await saveLearningContent(updated);
+    return queueOperation(`update-learning-${id}`, async () => {
+      console.log('Updating learning content:', id);
+      const updated = learningContent.map(l => 
+        l.id === id ? { ...l, ...updates } : l
+      );
+      await saveLearningContent(updated);
+    });
   };
 
   const deleteLearningContent = async (id: string) => {
-    await saveLearningContent(learningContent.filter(l => l.id !== id));
+    return queueOperation(`delete-learning-${id}`, async () => {
+      console.log('Deleting learning content:', id);
+      await saveLearningContent(learningContent.filter(l => l.id !== id));
+    });
   };
 
   const addUser = async (user: Omit<User, 'id' | 'createdAt'>) => {
-    const newUser: User = {
-      ...user,
-      id: Date.now().toString(),
-      createdAt: new Date(),
-    };
-    await saveUsers([...users, newUser]);
+    return queueOperation('add-user', async () => {
+      const newUser: User = {
+        ...user,
+        id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        createdAt: new Date(),
+      };
+      console.log('Adding new user:', newUser.id);
+      await saveUsers([...users, newUser]);
+    });
   };
 
   const updateUser = async (id: string, updates: Partial<User>) => {
-    const updated = users.map(u => 
-      u.id === id ? { ...u, ...updates, updatedAt: new Date() } : u
-    );
-    await saveUsers(updated);
+    return queueOperation(`update-user-${id}`, async () => {
+      console.log('Updating user:', id);
+      const updated = users.map(u => 
+        u.id === id ? { ...u, ...updates, updatedAt: new Date() } : u
+      );
+      await saveUsers(updated);
+    });
   };
 
   const deleteUser = async (id: string) => {
-    await saveUsers(users.filter(u => u.id !== id));
+    return queueOperation(`delete-user-${id}`, async () => {
+      console.log('Deleting user:', id);
+      await saveUsers(users.filter(u => u.id !== id));
+    });
   };
 
   return (

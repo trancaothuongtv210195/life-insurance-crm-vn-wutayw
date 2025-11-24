@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -79,67 +79,90 @@ export default function AddCustomerScreen() {
   // Classification
   const [classification, setClassification] = useState<CustomerClassification>('Potential');
 
-  // Saving state to prevent double-saves
+  // Saving state with ref to prevent race conditions
   const [isSaving, setIsSaving] = useState(false);
+  const saveInProgressRef = useRef(false);
 
   const isWeb = Platform.OS === 'web';
 
-  // Real-time phone number validation
+  // Real-time phone number validation with debounce
   useEffect(() => {
-    if (phoneNumber.trim()) {
-      if (checkPhoneNumberExists(phoneNumber.trim())) {
-        setPhoneError('Số điện thoại này đã tồn tại trong hệ thống');
+    const timer = setTimeout(() => {
+      if (phoneNumber.trim()) {
+        const exists = checkPhoneNumberExists(phoneNumber.trim());
+        if (exists) {
+          setPhoneError('⚠️ Số điện thoại này đã tồn tại trong hệ thống');
+        } else {
+          setPhoneError('');
+        }
       } else {
         setPhoneError('');
       }
-    } else {
-      setPhoneError('');
-    }
-  }, [phoneNumber]);
+    }, 300);
 
-  // Real-time contract number validation
+    return () => clearTimeout(timer);
+  }, [phoneNumber, checkPhoneNumberExists]);
+
+  // Real-time contract number validation with debounce
   useEffect(() => {
-    if (currentContractNumber.trim()) {
-      if (checkContractNumberExists(currentContractNumber.trim())) {
-        setContractError('Số hợp đồng này đã tồn tại trong hệ thống');
-      } else if (insuranceContracts.some(c => c.contractNumber === currentContractNumber.trim())) {
-        setContractError('Số hợp đồng này đã được thêm vào danh sách');
+    const timer = setTimeout(() => {
+      if (currentContractNumber.trim()) {
+        const existsInSystem = checkContractNumberExists(currentContractNumber.trim());
+        const existsInForm = insuranceContracts.some(c => c.contractNumber === currentContractNumber.trim());
+        
+        if (existsInSystem) {
+          setContractError('⚠️ Số hợp đồng này đã tồn tại trong hệ thống');
+        } else if (existsInForm) {
+          setContractError('⚠️ Số hợp đồng này đã được thêm vào danh sách');
+        } else {
+          setContractError('');
+        }
       } else {
         setContractError('');
       }
-    } else {
-      setContractError('');
-    }
-  }, [currentContractNumber, insuranceContracts]);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [currentContractNumber, insuranceContracts, checkContractNumberExists]);
 
   const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
 
-    if (!result.canceled) {
-      setAvatar(result.assets[0].uri);
+      if (!result.canceled && result.assets[0]) {
+        setAvatar(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Lỗi', 'Không thể chọn ảnh');
     }
   };
 
   const pickFiles = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images', 'videos'],
-      allowsMultipleSelection: true,
-      quality: 0.8,
-    });
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images', 'videos'],
+        allowsMultipleSelection: true,
+        quality: 0.8,
+      });
 
-    if (!result.canceled) {
-      const newFiles: FileAttachment[] = result.assets.map((asset, index) => ({
-        id: `${Date.now()}_${index}`,
-        uri: asset.uri,
-        type: asset.type === 'video' ? 'video' : 'image',
-        name: asset.fileName || `file_${index}`,
-      }));
-      setFiles([...files, ...newFiles]);
+      if (!result.canceled && result.assets.length > 0) {
+        const newFiles: FileAttachment[] = result.assets.map((asset, index) => ({
+          id: `file_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`,
+          uri: asset.uri,
+          type: asset.type === 'video' ? 'video' : 'image',
+          name: asset.fileName || `file_${index}`,
+        }));
+        setFiles([...files, ...newFiles]);
+      }
+    } catch (error) {
+      console.error('Error picking files:', error);
+      Alert.alert('Lỗi', 'Không thể chọn tệp');
     }
   };
 
@@ -167,7 +190,7 @@ export default function AddCustomerScreen() {
     return next;
   };
 
-  const addInsuranceContract = () => {
+  const addInsuranceContract = useCallback(() => {
     if (!currentCompany) {
       Alert.alert('Lỗi', 'Vui lòng chọn công ty bảo hiểm');
       return;
@@ -177,14 +200,13 @@ export default function AddCustomerScreen() {
       return;
     }
     
-    // Check for errors
     if (contractError) {
       Alert.alert('Cảnh báo', contractError);
       return;
     }
     
     const newContract: InsuranceContract = {
-      id: Date.now().toString(),
+      id: `contract_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       company: currentCompany,
       contractNumber: currentContractNumber.trim(),
       policyDetails: currentPolicyDetails,
@@ -194,7 +216,7 @@ export default function AddCustomerScreen() {
       nextPaymentDate: calculateNextPaymentDate(currentJoinDate, currentPaymentFrequency),
     };
     
-    setInsuranceContracts([...insuranceContracts, newContract]);
+    setInsuranceContracts(prev => [...prev, newContract]);
     
     // Reset form
     setCurrentCompany('');
@@ -206,12 +228,12 @@ export default function AddCustomerScreen() {
     setShowInsuranceForm(false);
     
     Alert.alert('Thành công', 'Đã thêm hợp đồng bảo hiểm');
-  };
+  }, [currentCompany, currentContractNumber, contractError, currentPolicyDetails, currentJoinDate, currentPremiumAmounts, currentPaymentFrequency]);
 
-  const handleSave = async () => {
-    // Prevent double-saves
-    if (isSaving) {
-      console.log('Already saving, ignoring duplicate save request');
+  const handleSave = useCallback(async () => {
+    // Double-check with ref to prevent race conditions
+    if (isSaving || saveInProgressRef.current) {
+      console.log('Save already in progress, ignoring duplicate call');
       return;
     }
 
@@ -225,13 +247,15 @@ export default function AddCustomerScreen() {
       return;
     }
 
-    // Check for phone error
     if (phoneError) {
       Alert.alert('Cảnh báo', phoneError);
       return;
     }
 
+    // Set both state and ref
     setIsSaving(true);
+    saveInProgressRef.current = true;
+    console.log('Starting save customer operation...');
 
     try {
       const provinceName = provinces.find(p => p.code === selectedProvince)?.name || '';
@@ -239,7 +263,7 @@ export default function AddCustomerScreen() {
       const communeName = communes[selectedDistrict]?.find(c => c.code === selectedCommune)?.name || '';
 
       const meetingRecords: MeetingRecord[] = meetingNotes ? [{
-        id: '1',
+        id: `meeting_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         date: meetingDate,
         notes: meetingNotes,
         createdAt: new Date(),
@@ -269,17 +293,33 @@ export default function AddCustomerScreen() {
         createdBy: user?.id || '1',
       };
 
+      console.log('Calling addCustomer with data:', newCustomer);
       await addCustomer(newCustomer);
+      
+      console.log('Customer added successfully');
       Alert.alert('Thành công', 'Đã thêm khách hàng mới', [
-        { text: 'OK', onPress: () => router.back() },
+        { 
+          text: 'OK', 
+          onPress: () => {
+            console.log('Navigating back...');
+            router.back();
+          }
+        },
       ]);
-    } catch (error) {
-      console.log('Error saving customer:', error);
-      Alert.alert('Lỗi', 'Không thể lưu khách hàng');
+    } catch (error: any) {
+      console.error('Error saving customer:', error);
+      Alert.alert('Lỗi', error.message || 'Không thể lưu khách hàng. Vui lòng thử lại.');
     } finally {
+      // Reset both state and ref
       setIsSaving(false);
+      saveInProgressRef.current = false;
     }
-  };
+  }, [
+    fullName, phoneNumber, phoneError, avatar, dateOfBirth, occupation,
+    financialStatus, familyInfo, classification, selectedProvince, selectedDistrict,
+    selectedCommune, hamlet, locationCoordinates, meetingDate, meetingNotes, files,
+    hasInsurance, insuranceContracts, user, addCustomer
+  ]);
 
   const getFrequencyLabel = (freq: PaymentFrequency) => {
     switch (freq) {
@@ -322,15 +362,17 @@ export default function AddCustomerScreen() {
           <input
             type="date"
             value={formatDateForInput(value)}
-            onChange={(e) => onChange(parseDateFromInput(e.target.value))}
+            onChange={(e) => {
+              const target = e.target as HTMLInputElement;
+              const newDate = parseDateFromInput(target.value);
+              onChange(newDate);
+            }}
             style={{
               backgroundColor: colors.secondary,
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 12,
-              paddingVertical: 14,
-              paddingHorizontal: 16,
-              fontSize: 16,
+              border: `1px solid ${colors.border}`,
+              borderRadius: '12px',
+              padding: '14px 16px',
+              fontSize: '16px',
               color: colors.text,
               width: '100%',
               fontFamily: 'inherit',
@@ -381,15 +423,16 @@ export default function AddCustomerScreen() {
           <Text style={styles.label}>{label}</Text>
           <select
             value={value}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={(e) => {
+              const target = e.target as HTMLSelectElement;
+              onChange(target.value);
+            }}
             style={{
               backgroundColor: colors.secondary,
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 12,
-              paddingVertical: 14,
-              paddingHorizontal: 16,
-              fontSize: 16,
+              border: `1px solid ${colors.border}`,
+              borderRadius: '12px',
+              padding: '14px 16px',
+              fontSize: '16px',
               color: colors.text,
               width: '100%',
               fontFamily: 'inherit',
@@ -436,15 +479,16 @@ export default function AddCustomerScreen() {
           <Text style={styles.label}>{label}</Text>
           <select
             value={value}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={(e) => {
+              const target = e.target as HTMLSelectElement;
+              onChange(target.value);
+            }}
             style={{
               backgroundColor: colors.secondary,
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 12,
-              paddingVertical: 14,
-              paddingHorizontal: 16,
-              fontSize: 16,
+              border: `1px solid ${colors.border}`,
+              borderRadius: '12px',
+              padding: '14px 16px',
+              fontSize: '16px',
               color: colors.text,
               width: '100%',
               fontFamily: 'inherit',
@@ -482,6 +526,7 @@ export default function AddCustomerScreen() {
         <TouchableOpacity
           style={styles.headerButton}
           onPress={() => router.back()}
+          disabled={isSaving}
         >
           <IconSymbol name="xmark" size={24} color={colors.text} />
         </TouchableOpacity>
@@ -842,15 +887,16 @@ export default function AddCustomerScreen() {
                         <Text style={styles.label}>Định kỳ phí</Text>
                         <select
                           value={currentPaymentFrequency}
-                          onChange={(e) => setCurrentPaymentFrequency(e.target.value as PaymentFrequency)}
+                          onChange={(e) => {
+                            const target = e.target as HTMLSelectElement;
+                            setCurrentPaymentFrequency(target.value as PaymentFrequency);
+                          }}
                           style={{
                             backgroundColor: colors.secondary,
-                            borderWidth: 1,
-                            borderColor: colors.border,
-                            borderRadius: 12,
-                            paddingVertical: 14,
-                            paddingHorizontal: 16,
-                            fontSize: 16,
+                            border: `1px solid ${colors.border}`,
+                            borderRadius: '12px',
+                            padding: '14px 16px',
+                            fontSize: '16px',
                             color: colors.text,
                             width: '100%',
                             fontFamily: 'inherit',
@@ -1199,7 +1245,7 @@ const styles = StyleSheet.create({
     color: colors.error,
     fontSize: 13,
     marginTop: 4,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   inputText: {
     fontSize: 16,

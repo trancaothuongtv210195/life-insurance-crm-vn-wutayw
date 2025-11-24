@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -24,21 +24,23 @@ export default function LearningScreen() {
   const [selectedContent, setSelectedContent] = useState<LearningContent | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const deleteInProgressRef = useRef(false);
 
-  const handleContentPress = (content: LearningContent) => {
+  const handleContentPress = useCallback((content: LearningContent) => {
     setSelectedContent(content);
     setShowDetailModal(true);
-  };
+  }, []);
 
-  const handleOpenVideo = (url: string) => {
+  const handleOpenVideo = useCallback((url: string) => {
     Linking.openURL(url).catch(() => {
       Alert.alert('Lỗi', 'Không thể mở video');
     });
-  };
+  }, []);
 
-  const handleDelete = async (id: string, title: string) => {
-    if (isDeleting) {
-      console.log('Already deleting, ignoring duplicate delete request');
+  const handleDelete = useCallback(async (id: string, title: string) => {
+    // Double-check with ref to prevent race conditions
+    if (isDeleting || deleteInProgressRef.current) {
+      console.log('Delete already in progress, ignoring duplicate call');
       return;
     }
 
@@ -48,21 +50,29 @@ export default function LearningScreen() {
         text: 'Xóa',
         style: 'destructive',
         onPress: async () => {
+          // Set both state and ref
           setIsDeleting(true);
+          deleteInProgressRef.current = true;
+          console.log('Starting delete learning content operation...');
+          
           try {
             await deleteLearningContent(id);
             setShowDetailModal(false);
+            setSelectedContent(null);
+            console.log('Learning content deleted successfully');
             Alert.alert('Thành công', 'Đã xóa bài học');
-          } catch (error) {
-            console.log('Error deleting learning content:', error);
-            Alert.alert('Lỗi', 'Không thể xóa bài học');
+          } catch (error: any) {
+            console.error('Error deleting learning content:', error);
+            Alert.alert('Lỗi', error.message || 'Không thể xóa bài học. Vui lòng thử lại.');
           } finally {
+            // Reset both state and ref
             setIsDeleting(false);
+            deleteInProgressRef.current = false;
           }
         },
       },
     ]);
-  };
+  }, [deleteLearningContent]);
 
   const getContentIcon = (type: string) => {
     switch (type) {
@@ -180,7 +190,11 @@ export default function LearningScreen() {
         visible={showDetailModal}
         transparent
         animationType="slide"
-        onRequestClose={() => setShowDetailModal(false)}
+        onRequestClose={() => {
+          if (!isDeleting) {
+            setShowDetailModal(false);
+          }
+        }}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -193,7 +207,10 @@ export default function LearningScreen() {
                   {selectedContent?.title}
                 </Text>
               </View>
-              <TouchableOpacity onPress={() => setShowDetailModal(false)}>
+              <TouchableOpacity 
+                onPress={() => setShowDetailModal(false)}
+                disabled={isDeleting}
+              >
                 <IconSymbol name="xmark.circle.fill" size={32} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
